@@ -1,1 +1,2 @@
 Verification marker for the normal Netlify auto-deploy path.
+Git-trigger verification refreshed after read-only security audit; awaiting production deploy for this main revision.
