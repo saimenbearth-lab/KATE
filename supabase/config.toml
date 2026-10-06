@@ -1,0 +1,6 @@
+project_id = "bshxiuzdqlqezqsrybtn"
+
+# Public Planner/event routes are validated in the Edge Function. The same
+# function applies KATE_ADMIN_SECRET auth before every sensitive operation.
+[functions.kate-api]
+verify_jwt = false

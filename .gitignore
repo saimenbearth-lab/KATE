@@ -46,3 +46,8 @@ node_modules/
 *.log
 .DS_Store
 Thumbs.db
+
+# Generated production frontend and local Supabase CLI state
+/dist/
+supabase/.temp/
+*.tsbuildinfo

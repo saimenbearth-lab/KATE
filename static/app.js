@@ -100,7 +100,38 @@
   }
 
   const dashboard = document.querySelector('[data-control-dashboard]');
-  if (dashboard) {
+  const loginForm = document.querySelector('[data-control-login]');
+  if (dashboard && loginForm) {
+    const secretInput = loginForm.querySelector('[data-admin-secret]');
+    const errorBox = loginForm.querySelector('[data-control-error]');
+    loginForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      errorBox.hidden = true;
+      if (!loginForm.reportValidity()) return;
+      const button = loginForm.querySelector('button[type="submit"]');
+      const secret = secretInput.value;
+      button.disabled = true;
+      try {
+        const response = await fetch('/api/control', {
+          headers: { 'Accept': 'application/json', 'Authorization': `Bearer ${secret}` },
+          cache: 'no-store',
+        });
+        const data = await response.json();
+        secretInput.value = '';
+        if (!response.ok) throw new Error(data.error || 'Stored aggregates are not available for this session.');
+        loginForm.hidden = true;
+        renderDashboard(data, dashboard);
+        dashboard.hidden = false;
+      } catch (error) {
+        errorBox.textContent = error.message || 'Admin access could not be verified.';
+        errorBox.hidden = false;
+      } finally {
+        secretInput.value = '';
+        button.disabled = false;
+      }
+    });
+  } else if (dashboard) {
+    // Local Python/SQLite preview compatibility; production uses the explicit login form above.
     fetch('/api/control', { headers: { 'Accept': 'application/json' } })
       .then(async (response) => {
         if (!response.ok) throw new Error('Stored aggregates are not available for this session.');
@@ -131,7 +162,7 @@
     ];
     eventLabels.forEach(([key, label]) => {
       const n = data.events[key] || 0;
-      eventGrid.append(metricCard(label, n ? String(n) : 'No data yet', 'Recorded SQLite events; no projections.'));
+      eventGrid.append(metricCard(label, n ? String(n) : 'No data yet', 'Persisted events; no projections.'));
     });
     container.append(eventGrid);
 
@@ -168,4 +199,13 @@
     outcomeSection.append(make('p', 'privacy-note', data.note));
     container.append(outcomeSection);
   }
+
+  // Static Netlify pages do not pass through the local Python GET handler.
+  const page = window.location.pathname.replace(/\/$/, '') || '/';
+  fetch('/api/event', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ event_type: 'page_view', page }),
+    keepalive: true,
+  }).catch(() => {});
 })();

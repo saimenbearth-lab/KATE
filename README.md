@@ -1,44 +1,47 @@
-# KATE MVP — temporary preview
+# KATE — static frontend and Supabase backend
 
-**Status: preview only. Not a production-ready sales page.** Built with Python's standard library, SQLite, HTML, CSS and vanilla JavaScript. No Cloudflare, cloud database, external account, third-party runtime, or supplier API is used.
+KATE preserves the existing Home, Kenya Trip Planner, Nairobi–Maasai Mara comparison and Control Center. The deployed architecture is a generated static frontend plus Supabase PostgreSQL and Edge Functions; the existing Python/SQLite server remains for local preview and regression compatibility only. Do not run `server.py` as the production server.
 
-## Run
+## Local use and checks
+
+Run the compatibility preview:
 
 ```bash
 python3 server.py --host 0.0.0.0 --port 8787
 ```
 
-The service binds to `0.0.0.0` for the current computer's temporary preview host. SQLite data is persisted locally at `data/kate.sqlite3` and is excluded from version control. This is preview persistence only—not a durable production cloud database or production hosting.
+Build the Netlify-publishable static site:
 
-Run automated API/security tests with:
+```bash
+python3 scripts/build_static.py
+```
+
+Run tests:
 
 ```bash
 python3 -m unittest discover -s tests -v
+node --test tests/test_edge_validation.mjs
 ```
 
-## Pages
+`dist/` is generated and ignored by Git. The build exports the existing page templates and copies the existing CSS, JavaScript and illustrative Mara image. It does not bundle Python, SQLite, database credentials or supplier keys into the published assets.
 
-- `/` — Home and transparent preview disclosure.
-- `/planner` — Functional local trip outline using origin, focus, days, party size, budget/person, interests, comfort, and optional date/flexibility. Nothing is sent to a supplier; no live match or availability check occurs.
-- `/mara` — Neutral 3-day Nairobi–Maasai Mara road vs fly-in decision guide. No products, prices, ratings, booking buttons or availability claims are presented.
-- `/control` — Configuration-only state until an admin secret exists. When configured, the page requires HTTP Basic (`admin` + secret) and displays SQLite aggregates only. Empty metric values render exactly **“No data yet”**.
+## Pages and API
 
-## Data and safety
+- `/` — Home and clear no-booking/no-verified-inventory disclosure.
+- `/planner` — validated planning outline, sent to the Supabase Edge Function and persisted as a planner session, intent and events.
+- `/mara` — existing neutral road-vs-fly-in decision guide. No unverified products, prices, ratings or booking links are shown.
+- `/control` — aggregate activity screen gated by a server-side `KATE_ADMIN_SECRET`; the browser field is not written to local/session storage.
 
-The SQLite schema covers destinations, travel intents, products, opportunities, pages, planner sessions, events, affiliate clicks, conversions, revenue, experiments, agent runs, business memory, and incidents. The optional local Viator snapshot is imported once at database creation, tagged discovery-only and partitioned by its Road/Fly source-filter evidence; the partitions are never combined into one product list. Price basis and date availability stay unconfirmed, affiliate URLs are absent, and snapshot records are not displayed publicly. No conversions or revenue are synthesized.
+Netlify serves `dist` and rewrites `/api/*` to the Supabase `kate-api` Edge Function. The function uses the server-side `SUPABASE_SERVICE_ROLE_KEY`; that key and all other server credentials must never be put in static assets. Public input handlers have bounded JSON request bodies and validated fields. Sensitive control, revenue and conversion routes require the server-side admin secret. Only verified products with confirmed date availability, an approved affiliate state and an HTTPS URL can create a tracked affiliate click.
 
-Real page views and accepted/finished planner requests are stored with source, page, intent, optional product, position, and timestamp fields. No names, contact details, full referrer URLs, or client IPs are stored in analytics. No affiliate-click event can be created unless a verified product has an approved HTTPS affiliate URL and confirmed availability; the current dataset has no such URL. Live supplier inventory is not connected. This preview exposes no supplier credential input, makes no supplier API request, and does not claim that local SQLite is production-ready.
+## Database and data policy
 
-The example config is intentionally empty. A local admin-only helper is available for Control Center access; it does not accept supplier credentials. To configure the admin secret later, run this from the project directory in a private terminal:
+The Git-tracked migration under `supabase/migrations/` translates all 14 existing SQLite entities to PostgreSQL with timestamps, keys, constraints, indexes and RLS. Browser roles receive no table or protected-RPC privileges. Planner completion is stored atomically in PostgreSQL; Control Center aggregates are read from the database, not from local SQLite. Only reference/configuration rows from the existing initializer are seeded. Product inventory, conversions and revenue are not synthesized.
 
-```bash
-python3 tools/configure_server_secret.py
-```
+The Supabase migration was applied to project `bshxiuzdqlqezqsrybtn` (KATE, `eu-central-1`). Its 14 tables and RLS settings were verified; an isolated persistence probe through the planner RPC was read back and removed. Edge Function source exists in this branch; no Supabase Edge Function has been deployed yet.
 
-The helper prompts without echoing, stores the admin secret outside the repository at `~/.config/kate-mvp/server.env` with owner-only permissions, enforces a minimum length, and never prints the value. It was **not run** for this preview; no admin secret was requested, stored or committed. Restart the service after future configuration. The service ignores a config file with group/world permissions.
+## Viator and production deployment status
 
-Standard-library-only regression tests run against a temporary SQLite database, not the persistent preview data. HTTP security headers, bounded JSON input, basic input validation, no-data admin gating and the no-affiliate-click condition are covered.
+The repository contains no verified Viator API endpoint, approved affiliate URL or currently usable supplier product data. No Viator request is made and no product is presented as bookable. `VIATOR_API_KEY` has not been requested, set, logged or committed. A secure Supabase Edge Function secret-entry path must be verified before asking the user to enter that key; exact supplier integration must follow the verified API contract rather than guessed endpoints.
 
-## Commercial boundaries
-
-The only supplied buying intent is a 3-day Nairobi–Maasai Mara road-vs-fly-in decision. Snapshot `fromPrice` values have no confirmed per-person basis or date-specific availability; cancellation records conflict and anomalies are documented. No affiliate URLs or commission terms were supplied. This MVP captures planning intent, but it does not make a booking, supplier hand-off, revenue, or conversion claim. Confirm offer data, booking terms, tracking, disclosure and actual product availability before any sales use.
+`netlify.toml` defines the static build and security headers, but no Netlify site has been created or deployed. The production migration is confined to `production-migration`; it has not been merged into `main`. Do not describe a local build as a live production deployment.

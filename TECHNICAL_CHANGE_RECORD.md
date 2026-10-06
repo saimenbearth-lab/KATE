@@ -67,3 +67,14 @@ The one screenshot was captured after the initial local/public route tests. The 
 ## Native secret-management blocker
 
 No native server-side secret write/injection point is available for this local app. The available Secret CLI can search saved references but cannot add or store one; no matching supplier reference was reported. An external connector setup card would introduce external integration/setup outside this scope. Without secure runtime injection, a live adapter cannot safely attach the required server-only authentication header. Therefore no credential field, ordinary config file, or browser form is provided for supplier credentials, and live inventory remains intentionally disconnected.
+
+
+## Production migration — 2026-10-06
+
+- **Branch:** `production-migration`, based on the requested first commit `0e12469a01300d307721485e3d8787c4c5e1dee2`; history retained.
+- **Audit:** the original routes are `/`, `/planner`, `/mara`, `/control`; frontend assets are vanilla JS/CSS plus the illustrative Mara image; `server.py` owns the preview HTTP routes, SQLite schema, Planner validation/itinerary, affiliate guards, admin Basic auth, and SQLite aggregates. The seven original HTTP/security tests passed before modification.
+- **Migration:** `supabase/migrations/20261006000100_kate_production_schema.sql` adds all 14 original entities, constraints, FKs, indexes, production timestamps, RLS, and restricted server-side RPCs. Applied to Supabase project `bshxiuzdqlqezqsrybtn`; project and migration status were verified. All 14 tables report RLS enabled; table grants were present only for `service_role`; three protected RPCs deny `anon` and `authenticated` execute privileges.
+- **Persistence check:** one temporary event row and one temporary Planner RPC completion were written, independently read back, then removed. No real conversion or revenue was added.
+- **Source migration:** `scripts/build_static.py` exports the existing pages into `dist/`; `netlify.toml` declares the build, publish directory, API proxy, and security headers; `supabase/functions/kate-api/` contains validated Planner/tracking/admin backend source. Local Python/SQLite remains only for preview/test compatibility.
+- **Tests at this stage:** 12 Python tests and 4 Node tests passed; static build and JS/Python syntax checks passed; credential-shaped token scan returned no matches.
+- **Still gated:** no Supabase Edge Function deployment, no Viator secret setup/request, no Viator API integration, no Netlify site creation/deployment, no merge to `main`. Netlify configuration approval is still outstanding. GitHub branch push is attempted only through existing authorization and only after local source is committed.
