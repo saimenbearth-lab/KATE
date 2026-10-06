@@ -1,0 +1,48 @@
+# Environment files and secrets (including example/local variants)
+.env
+.env.*
+**/.env
+**/.env.*
+
+# Local runtime configuration and credentials
+*.secret
+*.secrets
+*.credential
+*.credentials
+server.env
+
+# Local runtime data and SQLite databases
+/data/
+**/*.sqlite
+**/*.sqlite3
+**/*.sqlite-*
+**/*.sqlite3-*
+**/*.db
+**/*.db-*
+
+# Python bytecode, virtual environments, and test/tool caches
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Dependencies and generic caches
+node_modules/
+.cache/
+
+# Temporary preview exports and screenshots
+/artifacts/
+/screenshots/
+/previews/
+*.tmp
+*.temp
+
+# Logs and OS metadata
+*.log
+.DS_Store
+Thumbs.db
