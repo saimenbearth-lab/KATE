@@ -34,6 +34,7 @@ htmlcov/
 # Dependencies and generic caches
 node_modules/
 .cache/
+.netlify/
 
 # Temporary preview exports and screenshots
 /artifacts/
@@ -46,3 +47,8 @@ node_modules/
 *.log
 .DS_Store
 Thumbs.db
+
+# Generated production frontend and local Supabase CLI state
+/dist/
+supabase/.temp/
+*.tsbuildinfo
