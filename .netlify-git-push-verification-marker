@@ -1,0 +1,2 @@
+Verification-only marker; no product or application code.
+Used to test whether Git pushes trigger the production Netlify deploy.
