@@ -79,6 +79,32 @@ class ProductionBuildTests(unittest.TestCase):
         self.assertIn("kate_control_summary", sql)
         self.assertIn("ON DELETE SET NULL", sql)
 
+    def test_supplied_viator_clickouts_stay_discovery_only_and_exact(self):
+        sql = (ROOT / "supabase/migrations/20261006000200_kate_security_and_clickout_data.sql").read_text()
+        urls = (
+            "https://www.viator.com/tours/Nairobi/3-Days-2-Nights-Masai-Mara-Shared-Transport-Safari/d5280-427094P4?pid=P00323912&mcid=42383&medium=link&medium_version=selector",
+            "https://www.viator.com/tours/Nairobi/3-Days-masai-mara-safari/d5280-107758P7?pid=P00323912&mcid=42383&medium=link&medium_version=selector",
+            "https://www.viator.com/tours/Nairobi/3-Days-Masai-Mara-Flying-Safari-and-Hot-Air-Balloon-Ride-Package/d5280-260078P150?pid=P00323912&mcid=42383&medium=link&medium_version=selector",
+        )
+        for product_id, url in zip(("427094P4", "107758P7", "260078P150"), urls, strict=True):
+            self.assertIn(product_id, sql)
+            self.assertIn(url, sql)
+        self.assertIn("'discovery_needs_data'", sql)
+        self.assertIn("'unverified'", sql)
+        self.assertIn("'not_verified'", sql)
+        self.assertIn("'source_method', 'clickOffToPDP'", sql)
+        self.assertIn("ON CONFLICT (product_id) DO NOTHING", sql)
+        edge = (ROOT / "supabase/functions/kate-api/index.js").read_text()
+        self.assertIn('product.availability_state !== "confirmed"', edge)
+        self.assertIn("!product.date_availability_confirmed", edge)
+
+    def test_supabase_hardening_migration_revokes_public_definer_and_indexes_fk(self):
+        sql = (ROOT / "supabase/migrations/20261006000200_kate_security_and_clickout_data.sql").read_text()
+        self.assertIn("REVOKE ALL ON FUNCTION public.rls_auto_enable() FROM PUBLIC, anon, authenticated", sql)
+        self.assertIn("travel_intents_destination_id_idx", sql)
+        self.assertIn("2026-10-06T03:48:53Z", sql)
+        self.assertIn("source_last_checked", sql)
+
 
 if __name__ == "__main__":
     unittest.main()

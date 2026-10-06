@@ -34,6 +34,7 @@ htmlcov/
 # Dependencies and generic caches
 node_modules/
 .cache/
+.netlify/
 
 # Temporary preview exports and screenshots
 /artifacts/
