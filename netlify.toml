@@ -19,6 +19,11 @@
     Content-Security-Policy = "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; connect-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'; object-src 'none'"
 
 [[headers]]
+  for = "/build.json"
+  [headers.values]
+    Cache-Control = "no-store"
+
+[[headers]]
   for = "/*.html"
   [headers.values]
     Cache-Control = "no-cache, no-store, must-revalidate"

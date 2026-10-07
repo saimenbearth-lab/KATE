@@ -9,8 +9,8 @@ export function validatePlan(data) {
   const origin = typeof data.origin === "string" ? data.origin.trim() : "";
   if (!origin || origin.length > 80) return { error: "Add a starting point (80 characters maximum)." };
 
-  const days = Number(data.days);
-  const travelers = Number(data.travelers);
+  const days = data.days;
+  const travelers = data.travelers;
   if (!Number.isInteger(days) || days < 1 || days > 21) {
     return { error: "Trip length must be between 1 and 21 days." };
   }
@@ -23,7 +23,7 @@ export function validatePlan(data) {
 
   let budget = null;
   if (data.budget !== null && data.budget !== undefined && data.budget !== "") {
-    budget = Number(data.budget);
+    budget = data.budget;
     if (!Number.isFinite(budget) || budget < 0 || budget > 10_000_000) {
       return { error: "Enter a non-negative planning budget." };
     }
@@ -47,7 +47,7 @@ export function validatePlan(data) {
   let targetDate = null;
   if (data.target_date !== undefined && data.target_date !== null) {
     if (typeof data.target_date !== "string") return { error: "Use a valid date or leave it blank." };
-    const rawDate = data.target_date.trim().slice(0, 10);
+    const rawDate = data.target_date.trim();
     if (rawDate) {
       const date = new Date(`${rawDate}T00:00:00.000Z`);
       if (!/^\d{4}-\d{2}-\d{2}$/.test(rawDate) || Number.isNaN(date.valueOf()) || date.toISOString().slice(0, 10) !== rawDate) {

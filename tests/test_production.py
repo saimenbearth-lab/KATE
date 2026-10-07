@@ -94,7 +94,7 @@ class ProductionBuildTests(unittest.TestCase):
         self.assertIn("'not_verified'", sql)
         self.assertIn("'source_method', 'clickOffToPDP'", sql)
         self.assertIn("ON CONFLICT (product_id) DO NOTHING", sql)
-        edge = (ROOT / "supabase/functions/kate-api/index.js").read_text()
+        edge = (ROOT / "supabase/functions/kate-api/handler.js").read_text()
         self.assertIn('product.availability_state !== "confirmed"', edge)
         self.assertIn("!product.date_availability_confirmed", edge)
 

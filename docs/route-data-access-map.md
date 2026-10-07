@@ -1,25 +1,25 @@
 # KATE route and data-access map
 
-## Existing user-facing routes
+| Route | Behavior | Storage and access |
+|---|---|---|
+| `/` | Static trip planning introduction | Public page-view event |
+| `/planner` | Planning outline; optional 2–4-day Nairobi–Mara supplier previews | Atomic `record_planner_completion`, sessions, intents and events |
+| `/mara` | Road-versus-fly-in guide and on-demand three-day previews | Supplier search, private cache and product records |
+| `/control` | Session-only password field and aggregate dashboard | Bearer-protected `kate_control_summary` |
+| `/build.json` | Frontend release, build time and source commit | Public generated metadata; no secrets |
+| `/api/health` | Backend release and configuration flags | Private verifier existence check; no verifier returned |
+| `GET /api/offers` | Currency, 2–4-day duration and optional date filter | Viator Basic search; five-minute cache; refresh lease |
+| `POST /api/event` | Known page views only | Bounded JSON; `events` |
+| `POST /api/plan` | Validated planning input | Server-side start event and atomic completion RPC |
+| `POST /api/product-view` | Eligible server-side product activity | Current supplier catalogue or previously confirmed product |
+| `POST /api/affiliate-click` | Tracked 303 redirect to approved Viator URL | Native form or JSON; atomic `record_catalogue_click` |
+| `POST /api/conversions` | Evidence-backed, idempotent import | Admin authentication, source and external event ID required |
+| `POST /api/revenue` | Evidence-backed, idempotent import | Admin authentication, numeric amount and currency required |
 
-| Route | Existing implementation | Production implementation | Data access |
-|---|---|---|---|
-| `/` | `server.py` `HOME_HTML` | `dist/index.html` generated from the existing template | `POST /api/event` records a page view in `events` |
-| `/planner` | `PLANNER_HTML`, `POST /api/plan` | `dist/planner/index.html`, vanilla JS calls the Netlify rewrite | `events`, atomic RPC `record_planner_completion`, `planner_sessions`, `travel_intents` |
-| `/mara` | `MARA_HTML` | `dist/mara/index.html`; no invented offer/product cards | Page view only; product events/clicks require a real eligible `products` row |
-| `/control` | `control_html()`, Basic-auth preview API | Static Control Center with an ephemeral password field | `GET /api/control` requires `KATE_ADMIN_SECRET`; reads only aggregate RPC `kate_control_summary` |
-| `/healthz` | Python preview health route | Production health is `GET /api/health` through the function rewrite | No business data returned |
+Netlify serves `dist` and proxies `/api/*` to `kate-api`. Browser code contains no Supabase or supplier credential. Admin authentication uses the Edge environment secret or, when absent, a private stored SHA-256 verifier. An unconfigured service returns 503 and hides analytics; incorrect authentication returns 401.
 
-## Production API routing
+All 14 tables (`destinations`, `travel_intents`, `products`, `opportunities`, `pages`, `planner_sessions`, `events`, `affiliate_clicks`, `conversions`, `revenue`, `experiments`, `agent_runs`, `business_memory`, `incidents`) have RLS enabled. Browser roles have no table privileges or protected-RPC execution. Only server-side `service_role` has the required privileges. New RPCs use SECURITY INVOKER.
 
-Netlify serves only the static output directory `dist`. `/api/*` is a same-origin Netlify proxy to the Supabase Edge Function `kate-api`; browser code contains no database key. The public Edge Function entrypoint validates payload size and values. Only `page_view` can be emitted through the public event endpoint. Planner start events are recorded server-side before validation to retain the existing funnel behavior; successful sessions/intents/completion events are persisted atomically by the restricted `record_planner_completion` RPC.
+The three historical discovery products retain their exact supplied URLs and provenance. New catalogue previews are sourced from authenticated Viator `products/search`. They explicitly retain `date_availability_confirmed = false` and `price_basis_confirmed = false`. Approved catalogue click-outs are a separate eligibility path; they do not claim confirmed date availability or a party quote. Click eligibility expires after 15 minutes without a supplier refresh.
 
-Product view and affiliate-click endpoints query/act on server-side product records only. A click is tracked and redirected only when the product has confirmed date availability, an approved affiliate state, and an HTTPS URL. The present database is empty of products, so these endpoints return a safe “not verified” response. Conversion and revenue ingestion endpoints require the admin secret plus explicit evidence fields; no values are inferred.
-
-## PostgreSQL objects and protections
-
-The migration creates all 14 entities from the SQLite model: `destinations`, `travel_intents`, `products`, `opportunities`, `pages`, `planner_sessions`, `events`, `affiliate_clicks`, `conversions`, `revenue`, `experiments`, `agent_runs`, `business_memory`, and `incidents`. It adds foreign keys, check constraints, timestamps, query indexes and RLS on every table. `anon` and `authenticated` receive no table privileges or RPC execution; only the Edge Function's server-side `service_role` can access records. `service_role` and supplier credentials must never appear in static assets.
-
-## Explicit current limits
-
-The repository has no verified Viator API endpoint, affiliate link, or live product source. Therefore the current implementation does not call Viator and does not seed product rows. `VIATOR_API_KEY` has not been requested, set, stored, logged, or committed. The Supabase Edge Function secret-input path still needs direct verification before asking for that key. Netlify account/site state is read-only and no site has been created or deployed.
+The hourly SQL metrics routine reads actual stored records and writes a private summary plus an execution record. No booking, revenue, commission, supplier availability or persistent AI-agent run is fabricated.

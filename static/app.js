@@ -40,7 +40,7 @@
         });
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || 'We could not prepare this planning view.');
-        renderPlan(data, output);
+        renderPlan(data, output, payload);
         output.hidden = false;
         output.scrollIntoView({ behavior: 'smooth', block: 'start' });
       } catch (error) {
@@ -53,7 +53,7 @@
     });
   }
 
-  function renderPlan(data, container) {
+  function renderPlan(data, container, request) {
     container.replaceChildren();
     const card = make('section', 'output-card');
     const head = make('div', 'output-head');
@@ -84,8 +84,8 @@
 
     const notice = make('div', 'output-notice');
     const noticeText = make('div');
-    const strong = make('strong', '', 'No verified offers yet. ');
-    noticeText.append(strong, document.createTextNode(`${data.message} Live Viator inventory is not connected.`));
+    const strong = make('strong', '', 'Planning outline only. ');
+    noticeText.append(strong, document.createTextNode('Confirm itinerary, total party price and date-specific availability directly with the provider.'));
     notice.append(make('span', 'trust-icon', 'i'), noticeText);
     card.append(notice);
 
@@ -97,7 +97,128 @@
     actions.append(mara, home);
     card.append(actions);
     container.append(card);
+    if (request.origin.trim().toLowerCase() === 'nairobi' && request.focus === 'maasai_mara'
+        && request.days >= 2 && request.days <= 4) {
+      const section = makeOfferSection(request.currency);
+      container.append(section);
+      setupOffers(section, '/planner', request.target_date, request.days)();
+    }
   }
+
+  function makeOfferSection(currency) {
+    const section = make('section', 'offers-section');
+    section.setAttribute('data-offers', '');
+    section.setAttribute('data-nosnippet', '');
+    section.append(make('p', 'section-kicker', 'VIATOR PRODUCT PREVIEWS'));
+    section.append(make('h2', '', 'Explore Nairobi–Mara trips'));
+    section.append(make('p', 'offer-disclosure', 'Supplier from prices are a starting point. Final dates, total party price and availability are checked on Viator. These previews are not matched to your group, budget or comfort preference.'));
+    const controls = make('div', 'offer-controls');
+    const label = make('label', 'field');
+    label.append(make('span', '', 'Price currency'));
+    const select = make('select');
+    select.setAttribute('data-offer-currency', '');
+    ['USD', 'EUR', 'GBP', 'CHF'].forEach((value) => {
+      const option = make('option', '', value);
+      option.value = value;
+      select.append(option);
+    });
+    select.value = currency;
+    label.append(select);
+    const button = make('button', 'button button-quiet', 'Load product previews');
+    button.type = 'button';
+    button.setAttribute('data-offers-load', '');
+    controls.append(label, button);
+    section.append(controls);
+    const status = make('p', 'offer-status');
+    status.setAttribute('data-offers-status', '');
+    status.setAttribute('role', 'status');
+    const results = make('div', 'offer-grid');
+    results.setAttribute('data-offers-results', '');
+    section.append(status, results);
+    section.append(make('p', 'offer-disclosure', 'Affiliate disclosure: KATE may earn a commission if you book through a Viator link.'));
+    return section;
+  }
+
+  function setupOffers(section, sourcePage, targetDate = '', days = 3) {
+    const currency = section.querySelector('[data-offer-currency]');
+    const button = section.querySelector('[data-offers-load]');
+    const status = section.querySelector('[data-offers-status]');
+    const results = section.querySelector('[data-offers-results]');
+    const load = async () => {
+      button.disabled = true;
+      currency.disabled = true;
+      results.replaceChildren();
+      status.textContent = 'Loading supplier product previews…';
+      const params = new URLSearchParams({ currency: currency.value, days: String(days) });
+      if (targetDate) params.set('target_date', targetDate);
+      try {
+        const response = await fetch(`/api/offers?${params}`, { headers: { Accept: 'application/json' } });
+        const data = await response.json();
+        if (!response.ok) throw new Error(response.status === 503
+          ? 'Product previews are currently unavailable. You can still use the planning guide.'
+          : 'Product previews could not be loaded. Please try again later.');
+        if (!Array.isArray(data.offers)) throw new Error('Product previews could not be loaded. Please try again later.');
+        data.offers.forEach((offer) => results.append(renderOffer(offer, sourcePage)));
+        status.textContent = data.offers.length
+          ? 'From prices only. Date-specific availability and the price for your party have not been checked.'
+          : 'No supplier previews found. Date-specific availability has not been checked.';
+      } catch (error) {
+        status.textContent = error.message || 'Product previews are currently unavailable.';
+      } finally {
+        button.disabled = false;
+        currency.disabled = false;
+      }
+    };
+    button.addEventListener('click', load);
+    return load;
+  }
+
+  function renderOffer(offer, sourcePage) {
+    const card = make('article', 'offer-card');
+    card.append(make('h3', '', offer.title));
+    let price = 'From price unavailable';
+    if (typeof offer.from_price === 'number' && Number.isFinite(offer.from_price)) {
+      try {
+        price = `From ${new Intl.NumberFormat('en', { style: 'currency', currency: offer.currency }).format(offer.from_price)}`;
+      } catch (_) {
+        price = `From ${offer.from_price} ${offer.currency}`;
+      }
+    }
+    card.append(make('p', 'offer-price', price));
+    if (typeof offer.duration_minutes === 'number' && Number.isFinite(offer.duration_minutes)) {
+      card.append(make('p', 'offer-meta', `Supplier duration: ${offer.duration_minutes >= 1440
+        ? `${(offer.duration_minutes / 1440).toFixed(1).replace(/\.0$/, '')} days`
+        : `${offer.duration_minutes} minutes`}`));
+    }
+    if (typeof offer.rating === 'number' && Number.isFinite(offer.rating)) {
+      const reviews = Number.isInteger(offer.review_count) ? ` · ${offer.review_count} reviews` : '';
+      card.append(make('p', 'offer-meta', `Viator rating: ${offer.rating}/5${reviews}`));
+    }
+    const checkedAt = new Date(typeof offer.checked_at === 'string' ? offer.checked_at : NaN);
+    if (!Number.isNaN(checkedAt.getTime())) {
+      const checked = make('time', 'offer-meta', `Supplier data checked: ${checkedAt.toLocaleString('en')}`);
+      checked.dateTime = checkedAt.toISOString();
+      card.append(checked);
+    }
+    card.append(make('p', 'offer-disclosure', 'From price; final dates, party price and availability on Viator.'));
+    const handoff = make('form');
+    handoff.method = 'post';
+    handoff.action = '/api/affiliate-click';
+    [['product_id', offer.product_id], ['page', sourcePage]].forEach(([name, value]) => {
+      const field = make('input');
+      field.type = 'hidden';
+      field.name = name;
+      field.value = value;
+      handoff.append(field);
+    });
+    const button = make('button', 'button button-primary', 'Check details on Viator ↗');
+    button.type = 'submit';
+    handoff.append(button);
+    card.append(handoff);
+    return card;
+  }
+
+  document.querySelectorAll('[data-offers]').forEach((section) => setupOffers(section, '/mara'));
 
   const dashboard = document.querySelector('[data-control-dashboard]');
   const loginForm = document.querySelector('[data-control-login]');
