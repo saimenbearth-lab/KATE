@@ -22,6 +22,47 @@ test('invalid Planner bounds, dates, and types are rejected', () => {
   assert.match(validatePlan({ origin: 'Nairobi', days: 3, travelers: 2, interests: 'wildlife' }).error, /valid interests/);
 });
 
+test('Planner numeric fields reject JSON values that would coerce into numbers', () => {
+  const base = { origin: 'Nairobi', days: 3, travelers: 2 };
+  for (const field of ['days', 'travelers', 'budget']) {
+    for (const value of [true, false, [3], [], {}, '3']) {
+      const result = validatePlan({ ...base, [field]: value });
+      assert.equal(typeof result.error, 'string', `${field}: ${JSON.stringify(value)}`);
+    }
+  }
+});
+
+test('Planner accepts frontend numbers and optional blank budgets', () => {
+  const base = { origin: 'Nairobi', days: 3, travelers: 2 };
+  for (const budget of [null, undefined, '']) {
+    const result = validatePlan({ ...base, budget });
+    assert.equal(result.error, undefined);
+    assert.equal(result.value.budget, null);
+  }
+  for (const [budget, expected] of [[0, 0], [1200.126, 1200.13], [10_000_000, 10_000_000]]) {
+    const result = validatePlan({ ...base, budget });
+    assert.equal(result.error, undefined);
+    assert.equal(result.value.budget, expected);
+  }
+});
+
+test('Planner validates the complete calendar date without truncating suffixes', () => {
+  const base = { origin: 'Nairobi', days: 3, travelers: 2 };
+  for (const target_date of ['2026-10-07extra', '2026-10-07T12:00:00Z', '2026-10-071', '2026-02-29']) {
+    assert.match(validatePlan({ ...base, target_date }).error, /valid date/, target_date);
+  }
+  for (const target_date of ['2026-10-07', '2028-02-29']) {
+    const result = validatePlan({ ...base, target_date });
+    assert.equal(result.error, undefined);
+    assert.equal(result.value.targetDate, target_date);
+  }
+  for (const target_date of ['', null, undefined]) {
+    const result = validatePlan({ ...base, target_date });
+    assert.equal(result.error, undefined);
+    assert.equal(result.value.targetDate, null);
+  }
+});
+
 test('outline matches the original one-day and three-day itinerary behavior', () => {
   const one = buildItinerary({ origin: 'Nairobi', days: 1, focus: 'maasai_mara', interests: [] });
   assert.equal(one.length, 1);

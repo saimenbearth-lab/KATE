@@ -1,49 +1,40 @@
-# KATE — static frontend and Supabase backend
+# KATE — Kenya trip planning and supplier previews
 
-KATE preserves the existing Home, Kenya Trip Planner, Nairobi–Maasai Mara comparison and Control Center. The deployed architecture is a generated static frontend plus Supabase PostgreSQL and Edge Functions; the existing Python/SQLite server remains for local preview and regression compatibility only. Do not run `server.py` as the production server.
+Production: https://kate-kenya-trip-planner.netlify.app
 
-## Local use and checks
+KATE uses a generated static Netlify frontend and Supabase PostgreSQL/Edge Functions. The Python/SQLite server is retained for local previews and compatibility checks. Production does not run `server.py`.
 
-Run the compatibility preview:
+## Build and verification
 
 ```bash
 python3 server.py --host 0.0.0.0 --port 8787
-```
-
-Build the Netlify-publishable static site:
-
-```bash
 python3 scripts/build_static.py
-```
-
-Run tests:
-
-```bash
 python3 -m unittest discover -s tests -v
-node --test tests/test_edge_validation.mjs
+node --test tests/*.mjs
 ```
 
-`dist/` is generated and ignored by Git. The build exports the existing page templates and copies the existing CSS, JavaScript and illustrative Mara image. It does not bundle Python, SQLite, database credentials or supplier keys into the published assets.
+The build preserves the four existing pages and assets, adds supplier preview cards, and writes `dist/build.json` with the Netlify `COMMIT` identifier. Generated output is ignored by Git. GitHub Actions runs the Python checks, Node checks and complete static build. The original hero image must be present in a full checkout.
 
-## Pages and API
+## Public experience
 
-- `/` — Home and clear no-booking/no-verified-inventory disclosure.
-- `/planner` — validated planning outline, sent to the Supabase Edge Function and persisted as a planner session, intent and events.
-- `/mara` — existing neutral road-vs-fly-in decision guide. No unverified products, prices, ratings or booking links are shown.
-- `/control` — aggregate activity screen gated by a server-side `KATE_ADMIN_SECRET`; the browser field is not written to local/session storage.
+`/planner` saves a validated planning outline through an atomic database RPC. Nairobi–Maasai Mara plans of 2–4 days can load supplier product previews. `/mara` retains the road-versus-fly-in guide and lets visitors request three-day supplier previews in USD, EUR, GBP or CHF. Previews are not matched to a party budget or comfort preference. From prices, supplier ratings and durations are shown only when the supplier supplies usable values.
 
-Netlify serves `dist` and rewrites `/api/*` to the Supabase `kate-api` Edge Function. The function uses the server-side `SUPABASE_SERVICE_ROLE_KEY`; that key and all other server credentials must never be put in static assets. Public input handlers have bounded JSON request bodies and validated fields. Sensitive control, revenue and conversion routes require the server-side admin secret. Only verified products with confirmed date availability, an approved affiliate state and an HTTPS URL can create a tracked affiliate click.
+The API uses Viator Basic Affiliate `products/search`, on demand, with a five-minute response cache and a shared refresh lease. It does not use `availability/check`, which is unavailable to Basic access. A travel-date search filter does not confirm availability, a group quote, cancellation terms, commission or a booking. Visitors confirm the full itinerary, dates and total price on Viator.
 
-## Database and data policy
+Click-outs use native POST forms and a tracked HTTP 303 handoff. The database allows only fresh, active catalogue records from the verified supplier source and HTTPS Viator URLs with KATE's approved PID `P00323912`. Stale records require a refresh. The original discovery records and their provenance remain preserved; their historical links alone do not qualify as current previews.
 
-The Git-tracked migrations under `supabase/migrations/` translate all 14 existing SQLite entities to PostgreSQL with timestamps, keys, constraints, indexes and RLS. Browser roles receive no table or protected-RPC privileges; RLS has no permissive client policies by design. Planner completion is stored atomically in PostgreSQL; Control Center aggregates are read from the database, not from local SQLite. Three user-authorized source-returned click-outs are stored as discovery-only records; no conversions or revenue are synthesized.
+## Backend and access
 
-Both schema/data migrations were applied to project `bshxiuzdqlqezqsrybtn` (KATE, `eu-central-1`). All 14 tables have RLS enabled, client roles have no table privileges, and the production `kate-api` Edge Function is deployed. A live Planner POST wrote a session, intent and completion event, which were read back from PostgreSQL; temporary probe rows were removed. The existing postgres-owned `ensure_rls` trigger remains active, while browser roles no longer have EXECUTE on its SECURITY DEFINER function.
+Netlify rewrites `/api/*` to Supabase project `bshxiuzdqlqezqsrybtn`, function `kate-api`. Supplier and database credentials remain server-side. All 14 public tables have RLS enabled, with no browser table access or protected-RPC permissions. Public JSON bodies are bounded and validated.
 
-## Viator and production deployment status
+`/control`, conversion ingestion and revenue ingestion require Bearer authentication. The preferred credential is the Edge secret `KATE_ADMIN_SECRET`; a private SHA-256 verifier in `business_memory.control_admin_secret_sha256` is supported when the environment secret is absent. Missing configuration fails closed. Passwords are not stored in browser storage or committed to Git. Account login credentials are not used.
 
-The three source-returned IDs (`427094P4`, `107758P7`, `260078P150`) and exact click-out URLs supplied by KATE HQ are stored with the approved PID/tracking parameters and source provenance. Their record state is `discovery_needs_data`; `from_price`/currency are null, `availability_state` is `unverified`, and date availability, price basis, cancellation, commission, booking and revenue remain unverified. The approved PID/click-out state does not claim commission. The public product and affiliate endpoints return 409 for these records, and the Mara page does not present them as offers.
+Financial ingestion requires an external event ID and evidence. A stable source/event hash makes repeated imports idempotent. No conversions or revenue are inferred from searches or click-outs. See [the route map](docs/route-data-access-map.md) and [operations](docs/operations.md).
 
-`VIATOR_API_KEY` has not been requested, entered, logged or committed; no supplier API request or inventory sync is implemented. Do not infer live availability, a confirmed price basis, cancellations, commission, a booking or revenue from these links. The server reads `KATE_ADMIN_SECRET` only from Supabase Edge Function Secrets. The user will set it manually under **Supabase → KATE → Edge Functions → Secrets**; until then, Control Center access remains closed with HTTP 503. No Supabase account email/password was requested or stored.
+## Automation and deployment
 
-`netlify.toml` defines the static build and security headers. The production migration remains on `production-migration`; no Netlify site has yet been deployed. Do not describe a local build as a live production deployment.
+The applied `kate-hourly-metrics` pg_cron job runs at minute 10 of every UTC hour. It stores real event counts for the preceding 24 hours and evidence-backed lifetime financial totals by currency. It records its run in `agent_runs`. This is a deterministic database routine; it does not run six persistent AI agents, poll suppliers or publish content autonomously.
+
+The October 2026 changes were checked with four temporary collaborating agents during development. These development agents are not hosted services. Persistent CEO/Scout/Product/Growth/Builder/Money workers require a separate authenticated runner, model credentials, execution budgets and an operating policy.
+
+Deployment has two independent parts: Git changes trigger the Netlify frontend build; Edge Function changes require a separate Supabase deployment. Verify both `/build.json` and `/api/health` after publishing. The health response reports configuration flags, never keys. Deployment and verification evidence is documented in [operations](docs/operations.md).
