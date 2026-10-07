@@ -13,7 +13,7 @@ python3 -m unittest discover -s tests -v
 node --test tests/*.mjs
 ```
 
-The build preserves the four existing pages and assets, adds supplier preview cards, and writes `dist/build.json` with the Netlify `COMMIT` identifier. Generated output is ignored by Git. GitHub Actions runs the Python checks, Node checks and complete static build. The original hero image must be present in a full checkout.
+The build preserves the four existing pages and assets, adds supplier preview cards, and writes `dist/build.json` with the Netlify `COMMIT_REF` identifier (or `COMMIT` in CI). Generated output is ignored by Git. GitHub Actions runs the Python checks, Node checks and complete static build. The original hero image must be present in a full checkout.
 
 ## Public experience
 

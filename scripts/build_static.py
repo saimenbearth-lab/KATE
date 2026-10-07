@@ -104,7 +104,7 @@ def build(destination: Path | str = ROOT / "dist") -> Path:
     for asset in ("app.css", "app.js", "mara-hero.jpg"):
         shutil.copy2(ROOT / "static" / asset, output / "static" / asset)
     (output / "build.json").write_text(json.dumps({
-        "commit": os.environ.get("COMMIT"),
+        "commit": os.environ.get("COMMIT_REF") or os.environ.get("COMMIT"),
         "built_at": datetime.now(timezone.utc).isoformat(),
         "release": "kate-supplier-preview-v1",
     }) + "\n")
