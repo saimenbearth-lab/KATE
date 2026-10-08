@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import argparse
 from datetime import datetime, timezone
+from html import escape
 import json
 import os
+import re
 from pathlib import Path
 import shutil
 import sys
@@ -15,6 +17,52 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 import server  # noqa: E402
+from scripts.travel_guides import GUIDES  # noqa: E402
+
+SITE_URL = "https://kate-kenya-trip-planner.netlify.app"
+PAGE_PATHS = {"home": "/", "planner": "/planner/", "mara": "/mara/", "control": "/control/", "guides": "/guides/"}
+DESCRIPTIONS = {
+    "home": "Explore three-day Maasai Mara safari options from Nairobi. Compare supplier from prices and confirm your travel dates and full party price on Viator.",
+    "mara": "Browse three-day Maasai Mara safari previews from Nairobi, compare road and fly-in planning, and check itinerary details and final prices on Viator.",
+    "planner": "Build a Kenya trip planning outline with your dates, group size and preferences. Confirm supplier availability and total prices separately.",
+    "control": "Private KATE operations dashboard.",
+    "guides": "Practical Maasai Mara safari planning guides: three-day trips from Nairobi, private versus shared tours, and checks to make before booking.",
+}
+
+
+def search_metadata(title: str, path: str, description: str, *, private: bool = False, article: bool = False) -> str:
+    canonical = SITE_URL + path
+    tags = [
+        f'<link rel="canonical" href="{escape(canonical, quote=True)}">',
+        f'<meta property="og:title" content="{escape(title + " · KATE", quote=True)}">',
+        f'<meta property="og:description" content="{escape(description, quote=True)}">',
+        f'<meta property="og:url" content="{escape(canonical, quote=True)}">',
+        f'<meta property="og:type" content="{"article" if article else "website"}">',
+        '<meta property="og:site_name" content="KATE">',
+        f'<meta property="og:image" content="{SITE_URL}/static/mara-hero.jpg">',
+        '<meta property="og:image:alt" content="Illustrative Maasai Mara safari landscape">',
+        '<meta name="twitter:card" content="summary_large_image">',
+    ]
+    preview = os.environ.get("CONTEXT") in {"deploy-preview", "branch-deploy"}
+    if private or preview:
+        tags.append('<meta name="robots" content="noindex,follow">')
+    else:
+        entity = {"@context": "https://schema.org", "@type": "WebPage", "name": title, "description": description, "url": canonical}
+        if article:
+            entity["@type"] = "Article"
+            entity["headline"] = title
+            entity["author"] = {"@type": "Organization", "name": "KATE", "url": SITE_URL}
+        encoded = json.dumps(entity, ensure_ascii=False).replace("<", "\\u003c")
+        tags.append(f'<script type="application/ld+json">{encoded}</script>')
+    return "\n".join(tags)
+
+
+def guide_hub_html() -> str:
+    cards = "".join(
+        f'<article class="decision-card"><h2><a href="{escape(guide["path"], quote=True)}">{escape(guide["title"])}</a></h2><p>{escape(guide["description"])}</p></article>'
+        for guide in GUIDES
+    )
+    return '<section class="page-intro"><p class="eyebrow">KENYA SAFARI PLANNING</p><h1>Maasai Mara safari guides</h1><p>Make a useful shortlist before comparing supplier listings. These guides explain the questions to ask about your route, group and total price.</p></section><section class="guide-list">' + cards + '</section><section class="mara-cta"><div><h2>Ready to compare options?</h2><p>Check dates, inclusions and total party price on Viator.</p></div><a class="button button-light" href="/mara/#safari-options">See three-day safari options ↗</a></section>'
 
 
 PRODUCTION_CONTROL_HTML = '''
@@ -81,7 +129,7 @@ def production_mara_html() -> str:
     return body.replace('<section class="compare-section">', PRODUCTION_OFFERS_HTML + '<section class="compare-section">')
 
 
-def production_shell(title: str, body: str, current: str) -> bytes:
+def production_shell(title: str, body: str, current: str, *, path: str | None = None, description: str | None = None, article: bool = False) -> bytes:
     html = server.shell(title, body, current).decode("utf-8")
     html = html.replace(
         '<div class="preview-ribbon"><span>PREVIEW BUILD</span><span>Not a production-ready sales page · No live inventory or booking</span></div>',
@@ -107,8 +155,13 @@ def production_shell(title: str, body: str, current: str) -> bytes:
         "KATE Kenya trip planning preview. No offers or date availability are verified.",
         "KATE Kenya trip planning guide with supplier product previews. Check date availability and total party price on Viator.",
     )
-    if current in {"planner", "control"}:
-        html = html.replace('</head>', '<meta name="robots" content="noindex"></head>')
+    page_description = description or DESCRIPTIONS.get(current, DESCRIPTIONS["home"])
+    html = re.sub(r'<meta name="description" content="[^"]*">', '<meta name="description" content="' + escape(page_description, quote=True) + '">', html)
+    extras = search_metadata(title, path or PAGE_PATHS.get(current, "/"), page_description, private=current in {"planner", "control"}, article=article)
+    html = html.replace('</head>', extras + '</head>')
+    guide_link = '<a href="/guides/">Safari guides</a>'
+    html = html.replace('<div class="footer-links">', '<div class="footer-links">' + guide_link)
+    html = html.replace('</nav>', guide_link + '</nav>')
     return html.encode("utf-8")
 
 
@@ -123,11 +176,24 @@ def build(destination: Path | str = ROOT / "dist") -> Path:
         "planner/index.html": ("Kenya Trip Planner", server.PLANNER_HTML, "planner"),
         "mara/index.html": ("3-day Maasai Mara Safari Options from Nairobi", production_mara_html(), "mara"),
         "control/index.html": ("Control Center", PRODUCTION_CONTROL_HTML, "control"),
+        "guides/index.html": ("Maasai Mara safari planning guides", guide_hub_html(), "guides"),
     }
     for relative, (title, body, current) in pages.items():
         target = output / relative
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(production_shell(title, body, current))
+
+    for guide in GUIDES:
+        target = output / guide["path"].strip("/") / "index.html"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(production_shell(guide["title"], guide["body"], "guide", path=guide["path"], description=guide["description"], article=True))
+
+    public_paths = ["/", "/mara/", "/guides/", *(guide["path"] for guide in GUIDES)]
+    write_search_files(output, public_paths)
+    key = (ROOT / "indexnow-key.txt").read_text().strip()
+    if not re.fullmatch(r"[a-f0-9]{32}", key):
+        raise ValueError("Invalid IndexNow ownership key")
+    (output / (key + ".txt")).write_text(key + "\n")
 
     for asset in ("app.css", "app.js", "mara-hero.jpg"):
         shutil.copy2(ROOT / "static" / asset, output / "static" / asset)
@@ -139,12 +205,20 @@ def build(destination: Path | str = ROOT / "dist") -> Path:
     return output
 
 
+def write_search_files(output: Path, public_paths: list[str]) -> None:
+    urls = "".join(f'<url><loc>{escape(SITE_URL + path)}</loc></url>' for path in public_paths)
+    (output / "sitemap.xml").write_text('<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' + urls + '</urlset>\n')
+    preview = os.environ.get("CONTEXT") in {"deploy-preview", "branch-deploy"}
+    rules = "User-agent: *\nDisallow: /\n" if preview else "User-agent: *\nAllow: /\nDisallow: /control\nDisallow: /planner\nDisallow: /api/\n"
+    (output / "robots.txt").write_text(rules + f'Sitemap: {SITE_URL}/sitemap.xml\n')
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Build the KATE static Netlify frontend")
     parser.add_argument("--output", default=str(ROOT / "dist"), help="Output directory (default: dist)")
     args = parser.parse_args()
     output = build(args.output)
-    print(f"Built 4 KATE pages and 3 static assets into {output}")
+    print(f"Built {5 + len(GUIDES)} KATE pages and 3 static assets into {output}")
     return 0
 
 
