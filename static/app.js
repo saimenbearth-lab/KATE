@@ -218,7 +218,10 @@
     return card;
   }
 
-  document.querySelectorAll('[data-offers]').forEach((section) => setupOffers(section, '/mara'));
+  document.querySelectorAll('[data-offers]').forEach((section) => {
+    const load = setupOffers(section, '/mara');
+    if (window.location.hash === '#safari-options') load();
+  });
 
   const dashboard = document.querySelector('[data-control-dashboard]');
   const loginForm = document.querySelector('[data-control-login]');
