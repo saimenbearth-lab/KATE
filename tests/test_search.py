@@ -7,7 +7,8 @@ import unittest
 from unittest.mock import patch
 import xml.etree.ElementTree as ET
 
-from scripts.build_static import SITE_URL, production_shell, write_search_files
+from scripts.build_static import SITE_URL, production_shell, production_mara_html, write_search_files
+from scripts.booking_resource import RESOURCE
 from scripts.travel_guides import GUIDES
 
 
@@ -22,6 +23,17 @@ class Tags(HTMLParser):
 
 
 class SearchTests(unittest.TestCase):
+    def test_assistant_and_resource_use_existing_safe_offer_path(self):
+        mara = production_mara_html()
+        self.assertEqual(mara.count('data-sales-assistant'), 1)
+        self.assertIn('data-offers-title', mara)
+        self.assertIn('data-offer-days', mara)
+        self.assertEqual(mara.count('data-offer-currency'), 1)
+        html = production_shell(RESOURCE['title'], RESOURCE['body'], 'resource', path=RESOURCE['path'], description=RESOURCE['description']).decode()
+        self.assertIn('href="' + SITE_URL + RESOURCE['path'] + '"', html)
+        self.assertIn('src="/static/resources.js"', html)
+        self.assertIn('data-copy-template', html)
+        self.assertIn('href="/resources/safari-booking-checklist.txt"', html)
     def test_each_guide_has_correct_canonical_description_and_article(self):
         with patch.dict(os.environ, {'CONTEXT': 'production'}):
             for guide in GUIDES:

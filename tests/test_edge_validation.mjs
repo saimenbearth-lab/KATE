@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { buildItinerary, validatePageView, validatePlan } from '../supabase/functions/kate-api/validation.js';
 
 test('public guide analytics accepts published routes and rejects arbitrary paths', () => {
-  for (const path of ['/guides', '/guides/3-day-masai-mara-safari-from-nairobi', '/guides/private-vs-shared-masai-mara-safari']) {
+  for (const path of ['/guides', '/guides/3-day-masai-mara-safari-from-nairobi', '/guides/private-vs-shared-masai-mara-safari', '/resources/safari-booking-checklist']) {
     assert.equal(validatePageView({ page: path + '/' }), path);
   }
   for (const path of ['/guides/missing', '/guides?fake=1', '/guides/../../control']) {

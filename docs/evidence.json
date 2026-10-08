@@ -1,0 +1,46 @@
+{
+  "verified_at": "2026-10-08T17:18:08.847763+00:00",
+  "site": "https://kate-kenya-trip-planner.netlify.app",
+  "control_authentication": {
+    "without_password": 401,
+    "with_password": 200
+  },
+  "recorded_conversions": 0,
+  "recorded_revenue": [],
+  "affiliate_clicks": 5,
+  "known_test_clicks": 3,
+  "customer_revenue_claimed": false,
+  "supplier_cards": 3,
+  "full_tests_passed": 46,
+  "permanent_ai_workers_active": false,
+  "paid_campaign_started": false,
+  "native_browser_handoff_verified": true,
+  "automatic_offer_loading_verified": true,
+  "advertising_budget_eur": 0,
+  "new_paid_services_started": false,
+  "organic_launch": {
+    "production_commit": "dcb4e18137216595821840e249d5574dd93af386",
+    "public_pages_verified": 5,
+    "guides_published": 2,
+    "indexnow_http_status": 202,
+    "indexnow_validation_pending": true,
+    "indexing_verified": false,
+    "mobile_guide_verified": true,
+    "guide_to_supplier_cards_verified": 3,
+    "edge_version": 5
+  },
+  "unattributed_clicks_not_proven_customer_activity": 2,
+  "supplier_reports_automatically_synced": false,
+  "redteam_optimization": {
+    "production_commit": "8102a4ddf0a53dd091152f26aa372e6681895615",
+    "mobile_hero_bytes": 20258,
+    "desktop_hero_bytes": 79790,
+    "original_hero_bytes": 6376168,
+    "all_guide_dashboard_cards_verified": true,
+    "financial_imports_require_authentication": true,
+    "ci_passed": true
+  },
+  "snapshot_is_current_live_finance": false,
+  "scope": "Historical authenticated KATE records only. Not an automatically synchronized Viator balance.",
+  "development_agent_count_this_iteration": 5
+}

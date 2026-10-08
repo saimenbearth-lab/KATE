@@ -141,35 +141,93 @@
 
   function setupOffers(section, sourcePage, targetDate = '', days = 3) {
     const currency = section.querySelector('[data-offer-currency]');
+    const tripLength = section.querySelector('[data-offer-days]');
+    const priority = section.querySelector('[data-offer-priority]');
+    const assistant = section.querySelector('[data-sales-assistant]');
+    const checklist = section.querySelector('[data-assistant-checklist]');
     const button = section.querySelector('[data-offers-load]');
     const status = section.querySelector('[data-offers-status]');
     const results = section.querySelector('[data-offers-results]');
+    const controls = [button, currency, tripLength, priority].filter(Boolean);
+    let loading = false;
+    const updateChecklist = () => {
+      if (!checklist || !priority) return;
+      const checks = [
+        'Confirm your dates, number of travelers and the total price for your party.',
+        'Read the cancellation terms before paying.',
+      ];
+      if (priority.value === 'comfort') {
+        checks.splice(1, 0, 'Confirm the named accommodation, room sharing and bathroom facilities.',
+          'Check the vehicle type, group size and whether transfers and game drives are shared.');
+      } else if (priority.value === 'travel_time') {
+        checks.splice(1, 0, 'Check the pickup location, departure and return times, and complete itinerary.',
+          'Confirm road or air transfers and how much time is scheduled for game drives.');
+      } else {
+        checks.splice(1, 0, 'Check park fees, transfers, meals and every extra charge.');
+      }
+      const list = make('ul');
+      checks.forEach((check) => list.append(make('li', '', check)));
+      checklist.replaceChildren(make('h4', '', 'Your booking checklist'), list,
+        make('p', '', priority.value === 'cost'
+          ? 'Available previews are shown by lowest listed from price. This is not a quote for your group.'
+          : 'These questions help you compare listings. The previews are not verified matches for this priority.'));
+    };
+    if (priority) priority.addEventListener('change', updateChecklist);
+    updateChecklist();
     const load = async () => {
-      button.disabled = true;
-      currency.disabled = true;
+      if (loading) return;
+      loading = true;
+      controls.forEach((control) => { control.disabled = true; });
+      updateChecklist();
       results.replaceChildren();
       status.textContent = 'Loading supplier product previews…';
-      const params = new URLSearchParams({ currency: currency.value, days: String(days) });
+      const selectedDays = tripLength ? Number(tripLength.value) : days;
+      const params = new URLSearchParams({ currency: currency.value, days: String(selectedDays) });
+      if (assistant) {
+        const heading = section.querySelector('[data-offers-title]');
+        if (heading) heading.textContent = `${selectedDays}-day Maasai Mara safari options`;
+      }
       if (targetDate) params.set('target_date', targetDate);
       try {
-        const response = await fetch(`/api/offers?${params}`, { headers: { Accept: 'application/json' } });
+        const request = () => fetch(`/api/offers?${params}`, { headers: { Accept: 'application/json' } });
+        let response = await request();
+        if (response.status === 429) {
+          status.textContent = 'Safari options are busy. Waiting a few seconds, then trying once more…';
+          await new Promise((resolve) => setTimeout(resolve, 6000));
+          response = await request();
+        }
         const data = await response.json();
-        if (!response.ok) throw new Error(response.status === 503
-          ? 'Product previews are currently unavailable. You can still use the planning guide.'
-          : 'Product previews could not be loaded. Please try again later.');
+        if (!response.ok) throw new Error(response.status === 429
+          ? 'Safari options are still busy. Please try again shortly.'
+          : response.status === 503
+            ? 'Product previews are currently unavailable. You can still use the planning guide.'
+            : 'Product previews could not be loaded. Please try again later.');
         if (!Array.isArray(data.offers)) throw new Error('Product previews could not be loaded. Please try again later.');
-        data.offers.forEach((offer) => results.append(renderOffer(offer, sourcePage)));
+        const offers = [...data.offers];
+        if (priority && priority.value === 'cost') {
+          const price = (offer) => typeof offer.from_price === 'number' && Number.isFinite(offer.from_price)
+            ? offer.from_price : Infinity;
+          offers.sort((left, right) => price(left) - price(right));
+        }
+        offers.forEach((offer) => results.append(renderOffer(offer, sourcePage)));
         status.textContent = data.offers.length
           ? 'From prices only. Date-specific availability and the price for your party have not been checked.'
           : 'No supplier previews found. Date-specific availability has not been checked.';
       } catch (error) {
         status.textContent = error.message || 'Product previews are currently unavailable.';
       } finally {
-        button.disabled = false;
-        currency.disabled = false;
+        controls.forEach((control) => { control.disabled = false; });
+        loading = false;
       }
     };
-    button.addEventListener('click', load);
+    if (assistant) {
+      assistant.addEventListener('submit', (event) => {
+        event.preventDefault();
+        load();
+      });
+    } else {
+      button.addEventListener('click', load);
+    }
     return load;
   }
 
