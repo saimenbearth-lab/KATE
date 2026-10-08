@@ -220,7 +220,15 @@
 
   document.querySelectorAll('[data-offers]').forEach((section) => {
     const load = setupOffers(section, '/mara');
-    if (window.location.hash === '#safari-options') load();
+    let linkedLoadStarted = false;
+    const loadLinkedOptions = () => {
+      if (window.location.hash === '#safari-options' && !linkedLoadStarted) {
+        linkedLoadStarted = true;
+        load();
+      }
+    };
+    window.addEventListener('hashchange', loadLinkedOptions);
+    loadLinkedOptions();
   });
 
   const dashboard = document.querySelector('[data-control-dashboard]');

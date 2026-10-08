@@ -45,13 +45,13 @@ def production_home_html() -> str:
         "Start in Nairobi. Browse supplier product previews and from prices, then check your dates, itinerary and full party price on Viator.",
     ).replace(
         '<div class="hero-actions"><a class="button button-primary" href="/planner">Start your Kenya trip plan <span aria-hidden="true">↗</span></a><a class="button button-quiet" href="/mara">Compare road vs fly-in</a></div>',
-        '<div class="hero-actions"><a class="button button-primary" href="/mara#safari-options">See 3-day safari options <span aria-hidden="true">↗</span></a><a class="button button-quiet" href="/planner">Plan my trip</a></div>',
+        '<div class="hero-actions"><a class="button button-primary" href="/mara/#safari-options">See 3-day safari options <span aria-hidden="true">↗</span></a><a class="button button-quiet" href="/planner">Plan my trip</a></div>',
     ).replace(
         "Offers, prices and date availability are <strong>not verified</strong>.",
         "From prices only. <strong>Confirm dates and total price on Viator.</strong>",
     ).replace(
         '<a class="decision-card" href="/mara">',
-        '<a class="decision-card" href="/mara#safari-options">',
+        '<a class="decision-card" href="/mara/#safari-options">',
     ).replace(
         "Road or fly-in? Compare the verification checklist, not an unconfirmed headline price.",
         "Explore 3-day supplier previews. Check dates, total party price and inclusions on Viator before booking.",
