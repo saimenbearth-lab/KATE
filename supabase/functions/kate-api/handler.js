@@ -8,6 +8,9 @@ export function createHandler({ dbFactory, env, fetchImpl = fetch }) {
     "/planner": "trip_planning",
     "/mara": "mara_3d_decision",
     "/control": "internal_operations",
+    "/guides": "mara_safari_research",
+    "/guides/3-day-masai-mara-safari-from-nairobi": "mara_3d_decision",
+    "/guides/private-vs-shared-masai-mara-safari": "mara_group_type_decision",
   };
 
   function headers(extra = {}) {

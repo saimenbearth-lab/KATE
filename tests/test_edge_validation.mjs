@@ -2,6 +2,15 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildItinerary, validatePageView, validatePlan } from '../supabase/functions/kate-api/validation.js';
 
+test('public guide analytics accepts published routes and rejects arbitrary paths', () => {
+  for (const path of ['/guides', '/guides/3-day-masai-mara-safari-from-nairobi', '/guides/private-vs-shared-masai-mara-safari']) {
+    assert.equal(validatePageView({ page: path + '/' }), path);
+  }
+  for (const path of ['/guides/missing', '/guides?fake=1', '/guides/../../control']) {
+    assert.equal(validatePageView({ page: path }), null);
+  }
+});
+
 test('valid Planner payload preserves the original limits and normalized inputs', () => {
   const result = validatePlan({
     origin: ' Nairobi ', focus: 'maasai_mara', days: 3, travelers: 2,
