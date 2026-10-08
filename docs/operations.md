@@ -36,6 +36,17 @@ No end-to-end booking or affiliate payout has been verified. All revenue claims 
 
 ## Direct visitor path
 
-Production commit `48d75eeb653af717b51819340ee5a07c3069ca3b` publishes the direct `/mara/#safari-options` path. Home links to the anchored three-day supplier section above the comparison. Direct-link visits automatically request previews. GitHub Actions run [37755994147](https://github.com/saimenbearth-lab/KATE/actions/runs/37755994147) passed the full Python/Node checks and build. Acquisition copy is prepared separately; no paid campaign or outbound outreach has been launched. Channel and advertising budget are awaiting the user.
+Production commit `48d75eeb653af717b51819340ee5a07c3069ca3b` publishes the direct `/mara/#safari-options` path. Home links to the anchored three-day supplier section above the comparison. Direct-link visits automatically request previews. GitHub Actions run [37755994147](https://github.com/saimenbearth-lab/KATE/actions/runs/37755994147) passed the full Python/Node checks and build. Acquisition copy is prepared separately; no paid campaign or outbound outreach has been launched. The user has fixed the advertising budget at €0. Do not ask for it again; launch with free organic discovery and no new paid services.
 
 A real browser form submission exposed a form-action CSP block that HTTP-only verification did not catch. PR [4](https://github.com/saimenbearth-lab/KATE/pull/4) permits only the exact HTTPS Viator hosts already enforced by the backend and loads previews on hash navigation. Production commit `8dd890c8df52031b23036c9a9dfb7541fac0d07e` passed the full CI checks and was verified with a native browser form: three automatically loaded cards, navigation to www.viator.com, correct PID and no form-action violations. No booking or revenue was created.
+
+
+## Free organic launch
+
+The user requires €0 advertising spend and maximum autonomous setup. No new paid service, model key or acquisition-channel choice is needed for this launch. Ask only for an unavoidable action and state it in one simple instruction.
+
+PR [5](https://github.com/saimenbearth-lab/KATE/pull/5), production commit `dcb4e18137216595821840e249d5574dd93af386`, adds a guide hub and two original buyer-intent guides, internal navigation, canonical/social/article metadata, a five-page sitemap and robots rules. Preview builds and private planner/control pages carry noindex directives. Edge version 5 accepts only the published guide routes for public page events. CI run [37788395847](https://github.com/saimenbearth-lab/KATE/actions/runs/37788395847) passed 18 Python tests, 28 Node cases and the full seven-page static build.
+
+Live checks confirmed HTTP 200 for all five public pages, correct canonical URLs, the public sitemap and its robots declaration, healthy API and unauthenticated admin rejection (401). The mobile guide had no horizontal overflow; its primary link opened the anchored supplier section with three automatically loaded cards. The explicit guide page-event verification returned 202; verification visits are test activity.
+
+Five public URLs were submitted once to IndexNow after verifying the live ownership file. The service returned HTTP 202: receipt accepted, ownership validation pending. This is not evidence of indexing, ranking, traffic, a booking, commission or payment. No paid campaign or outbound message was sent. The last verified finance snapshot still contains zero conversions and no revenue records.
