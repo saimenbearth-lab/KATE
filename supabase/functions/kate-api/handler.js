@@ -11,6 +11,7 @@ export function createHandler({ dbFactory, env, fetchImpl = fetch }) {
     "/guides": "mara_safari_research",
     "/guides/3-day-masai-mara-safari-from-nairobi": "mara_3d_decision",
     "/guides/private-vs-shared-masai-mara-safari": "mara_group_type_decision",
+    "/resources/safari-booking-checklist": "safari_booking_checks",
   };
 
   function headers(extra = {}) {
@@ -183,7 +184,7 @@ export function createHandler({ dbFactory, env, fetchImpl = fetch }) {
         .select("product_id,search_partition,snapshot_context").eq("product_id", offer.product_id).maybeSingle()));
       if (previous.some((result) => result.error)) return jsonResponse(503, { error: "Safari options are temporarily unavailable." });
       const rows = offers.map((offer, index) => ({
-        product_id: offer.product_id, comparison_id: "nairobi-mara-3day", search_partition: previous[index].data?.search_partition || "unresolved",
+        product_id: offer.product_id, comparison_id: `nairobi-mara-${days}day`, search_partition: previous[index].data?.search_partition || "unresolved",
         provider: "Viator", product_name: offer.title, destination_text: "Nairobi / Maasai Mara, Kenya", category: "safari",
         from_price: offer.from_price, currency: offer.currency, price_basis_confirmed: false,
         date_availability_confirmed: false, availability_state: "unverified",

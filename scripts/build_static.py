@@ -18,6 +18,8 @@ if str(ROOT) not in sys.path:
 
 import server  # noqa: E402
 from scripts.travel_guides import GUIDES  # noqa: E402
+from scripts.sales_assistant import ADVISOR_HTML  # noqa: E402
+from scripts.booking_resource import RESOURCE, CHECKLIST_MARKDOWN  # noqa: E402
 
 SITE_URL = "https://kate-kenya-trip-planner.netlify.app"
 PAGE_PATHS = {"home": "/", "planner": "/planner/", "mara": "/mara/", "control": "/control/", "guides": "/guides/"}
@@ -62,6 +64,7 @@ def guide_hub_html() -> str:
         f'<article class="decision-card"><h2><a href="{escape(guide["path"], quote=True)}">{escape(guide["title"])}</a></h2><p>{escape(guide["description"])}</p></article>'
         for guide in GUIDES
     )
+    cards += f'<article class="decision-card"><h2><a href="{RESOURCE["path"]}">{escape(RESOURCE["title"])}</a></h2><p>{escape(RESOURCE["description"])}</p></article>'
     return '<section class="page-intro"><p class="eyebrow">KENYA SAFARI PLANNING</p><h1>Maasai Mara safari guides</h1><p>Make a useful shortlist before comparing supplier listings. These guides explain the questions to ask about your route, group and total price.</p></section><section class="guide-list">' + cards + '</section><section class="mara-cta"><div><h2>Ready to compare options?</h2><p>Check dates, inclusions and total party price on Viator.</p></div><a class="button button-light" href="/mara/#safari-options">See three-day safari options ↗</a></section>'
 
 
@@ -82,6 +85,7 @@ PRODUCTION_OFFERS_HTML = '''
 <p class="offer-disclosure">Affiliate disclosure: KATE may earn a commission if you book through a Viator link.</p>
 </section>
 '''
+PRODUCTION_OFFERS_HTML = re.sub(r'<div class="offer-controls">.*?</div>', ADVISOR_HTML, PRODUCTION_OFFERS_HTML, count=1, flags=re.S).replace('<h2>3-day Maasai Mara safari options</h2>', '<h2 data-offers-title>3-day Maasai Mara safari options</h2>')
 
 
 def production_home_html() -> str:
@@ -170,6 +174,9 @@ def production_shell(title: str, body: str, current: str, *, path: str | None = 
     guide_link = '<a href="/guides/">Safari guides</a>'
     html = html.replace('<div class="footer-links">', '<div class="footer-links">' + guide_link)
     html = html.replace('</nav>', guide_link + '</nav>')
+    html = html.replace('<div class="footer-links">', '<div class="footer-links"><a href="' + RESOURCE["path"] + '">Free booking checklist</a>')
+    if 'data-copy-template' in body:
+        html = html.replace('</head>', '<script src="/static/resources.js" defer></script></head>')
     return html.encode("utf-8")
 
 
@@ -196,14 +203,19 @@ def build(destination: Path | str = ROOT / "dist") -> Path:
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(production_shell(guide["title"], guide["body"], "guide", path=guide["path"], description=guide["description"], article=True))
 
-    public_paths = ["/", "/mara/", "/guides/", *(guide["path"] for guide in GUIDES)]
+    target = output / RESOURCE["path"].strip("/") / "index.html"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_bytes(production_shell(RESOURCE["title"], RESOURCE["body"], "resource", path=RESOURCE["path"], description=RESOURCE["description"]))
+    (output / "resources/safari-booking-checklist.txt").write_text(CHECKLIST_MARKDOWN, encoding="utf-8")
+
+    public_paths = ["/", "/mara/", "/guides/", *(guide["path"] for guide in GUIDES), RESOURCE["path"]]
     write_search_files(output, public_paths)
     key = (ROOT / "indexnow-key.txt").read_text().strip()
     if not re.fullmatch(r"[a-f0-9]{32}", key):
         raise ValueError("Invalid IndexNow ownership key")
     (output / (key + ".txt")).write_text(key + "\n")
 
-    for asset in ("app.css", "app.js", "mara-hero.jpg"):
+    for asset in ("app.css", "app.js", "resources.js", "mara-hero.jpg"):
         shutil.copy2(ROOT / "static" / asset, output / "static" / asset)
     (output / "build.json").write_text(json.dumps({
         "commit": os.environ.get("COMMIT_REF") or os.environ.get("COMMIT"),
@@ -226,7 +238,7 @@ def main() -> int:
     parser.add_argument("--output", default=str(ROOT / "dist"), help="Output directory (default: dist)")
     args = parser.parse_args()
     output = build(args.output)
-    print(f"Built {5 + len(GUIDES)} KATE pages and 3 static assets into {output}")
+    print(f"Built {6 + len(GUIDES)} KATE pages and 4 static assets into {output}")
     return 0
 
 

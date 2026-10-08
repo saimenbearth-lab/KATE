@@ -24,6 +24,12 @@
     Cache-Control = "no-store"
 
 [[headers]]
+  for = "/resources/safari-booking-checklist.txt"
+  [headers.values]
+    Content-Disposition = 'attachment; filename="safari-booking-checklist.txt"'
+    X-Robots-Tag = "noindex"
+
+[[headers]]
   for = "/*.html"
   [headers.values]
     Cache-Control = "no-cache, no-store, must-revalidate"

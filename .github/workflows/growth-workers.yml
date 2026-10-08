@@ -1,0 +1,110 @@
+name: KATE free public workers
+on:
+  schedule:
+    - cron: '23 7 * * *'
+  workflow_dispatch:
+  workflow_run:
+    workflows: ['Verify KATE']
+    types: [completed]
+    branches: [main]
+permissions:
+  contents: read
+concurrency:
+  group: kate-free-public-workers
+  cancel-in-progress: false
+jobs:
+  health-monitor:
+    if: github.event_name != 'workflow_run' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' && github.event.workflow_run.head_repository.full_name == github.repository)
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+      - name: Check public pages, API and admin protection
+        env:
+          EXPECTED_COMMIT: ${{ github.event.workflow_run.head_sha || github.sha }}
+        run: python3 scripts/growth_workers.py health-monitor --expected-commit "$EXPECTED_COMMIT" --wait-attempts 3 --output reports/health-monitor.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: kate-health-monitor
+          path: reports/health-monitor.json
+          retention-days: 14
+  search-discovery:
+    if: github.event_name != 'workflow_run' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' && github.event.workflow_run.head_repository.full_name == github.repository)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          fetch-depth: 2
+      - name: Restore last accepted notification fingerprints
+        id: discovery-state
+        uses: actions/cache/restore@v4
+        with:
+          path: .kate-discovery/state.json
+          key: kate-notified-pages-v1-${{ github.run_id }}
+          restore-keys: kate-notified-pages-v1-
+      - name: Validate sitemap and notify only changed public content after a verified main deployment
+        id: discovery
+        env:
+          EXPECTED_COMMIT: ${{ github.event.workflow_run.head_sha || github.sha }}
+          MAY_SUBMIT: ${{ github.event_name == 'workflow_run' }}
+        run: |
+          args=()
+          if [ "$MAY_SUBMIT" = "true" ]; then
+            git rev-parse --verify 'HEAD^' >/dev/null
+            if ! git diff --quiet 'HEAD^' HEAD -- server.py scripts/build_static.py scripts/travel_guides.py scripts/booking_resource.py scripts/sales_assistant.py static netlify.toml indexnow-key.txt; then
+              args+=(--submit)
+            fi
+          fi
+          python3 scripts/growth_workers.py search-discovery --expected-commit "$EXPECTED_COMMIT" --wait-attempts 3 --state-file .kate-discovery/state.json --output reports/search-discovery.json "${args[@]}"
+          python3 -c 'import json,os; r=json.load(open("reports/search-discovery.json")); open(os.environ["GITHUB_OUTPUT"],"a").write("submitted="+str(r["details"]["submitted"]).lower()+"\n")'
+      - name: Persist fingerprints only after accepted notification
+        if: steps.discovery.outputs.submitted == 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: .kate-discovery/state.json
+          key: kate-notified-pages-v1-${{ github.run_id }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: kate-search-discovery
+          path: reports/search-discovery.json
+          retention-days: 14
+  evidence-auditor:
+    if: github.event_name != 'workflow_run' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' && github.event.workflow_run.head_repository.full_name == github.repository)
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+      - name: Audit historical snapshot consistency without private finance access
+        run: python3 scripts/growth_workers.py evidence-auditor --evidence-file docs/evidence.json --output reports/evidence-auditor.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: kate-evidence-auditor
+          path: reports/evidence-auditor.json
+          retention-days: 14
+  resource-auditor:
+    if: github.event_name != 'workflow_run' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' && github.event.workflow_run.head_repository.full_name == github.repository)
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+      - name: Check public checklist and booking-options path, without sending messages
+        env:
+          EXPECTED_COMMIT: ${{ github.event.workflow_run.head_sha || github.sha }}
+        run: python3 scripts/growth_workers.py resource-auditor --expected-commit "$EXPECTED_COMMIT" --wait-attempts 3 --resource-path /resources/safari-booking-checklist/ --output reports/resource-auditor.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: kate-resource-auditor
+          path: reports/resource-auditor.json
+          retention-days: 14

@@ -1,4 +1,4 @@
-export const ALLOWED_PAGES = new Set(["/", "/planner", "/mara", "/control", "/guides", "/guides/3-day-masai-mara-safari-from-nairobi", "/guides/private-vs-shared-masai-mara-safari"]);
+export const ALLOWED_PAGES = new Set(["/", "/planner", "/mara", "/control", "/guides", "/guides/3-day-masai-mara-safari-from-nairobi", "/guides/private-vs-shared-masai-mara-safari", "/resources/safari-booking-checklist"]);
 export const ALLOWED_INTERESTS = new Set(["wildlife", "culture", "photography", "slow_pace"]);
 
 export function validatePlan(data) {
