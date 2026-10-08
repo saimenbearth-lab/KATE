@@ -26,20 +26,48 @@ PRODUCTION_CONTROL_HTML = '''
 
 
 PRODUCTION_OFFERS_HTML = '''
-<section class="offers-section" data-offers data-nosnippet>
-<p class="section-kicker">VIATOR PRODUCT PREVIEWS</p><h2>Explore Nairobi–Mara trips</h2>
+<section class="offers-section" id="safari-options" data-offers data-nosnippet>
+<p class="section-kicker">VIATOR PRODUCT PREVIEWS</p><h2>3-day Maasai Mara safari options</h2>
 <p class="offer-disclosure">Supplier from prices are a starting point. Final dates, total party price and availability are checked on Viator. Confirm the route, departure point and full itinerary before deciding.</p>
-<div class="offer-controls"><label class="field"><span>Price currency</span><select data-offer-currency><option>USD</option><option>EUR</option><option>GBP</option><option>CHF</option></select></label><button class="button button-quiet" type="button" data-offers-load>Load product previews</button></div>
+<div class="offer-controls"><label class="field"><span>Price currency</span><select data-offer-currency><option>USD</option><option>EUR</option><option>GBP</option><option>CHF</option></select></label><button class="button button-primary" type="button" data-offers-load>Show 3-day safari options</button></div>
 <p class="offer-status" data-offers-status role="status">Load supplier previews to see from prices. Date-specific availability has not been checked.</p><div class="offer-grid" data-offers-results></div>
 <p class="offer-disclosure">Affiliate disclosure: KATE may earn a commission if you book through a Viator link.</p>
 </section>
 '''
 
 
+def production_home_html() -> str:
+    return server.HOME_HTML.replace(
+        "Plan your Kenya trip with the details that matter.",
+        "Explore 3-day Maasai Mara safaris.",
+    ).replace(
+        "Start with your travel preferences. For one focused decision, compare road and fly-in planning for a 3-day Nairobi–Maasai Mara trip.",
+        "Start in Nairobi. Browse supplier product previews and from prices, then check your dates, itinerary and full party price on Viator.",
+    ).replace(
+        '<div class="hero-actions"><a class="button button-primary" href="/planner">Start your Kenya trip plan <span aria-hidden="true">↗</span></a><a class="button button-quiet" href="/mara">Compare road vs fly-in</a></div>',
+        '<div class="hero-actions"><a class="button button-primary" href="/mara#safari-options">See 3-day safari options <span aria-hidden="true">↗</span></a><a class="button button-quiet" href="/planner">Plan my trip</a></div>',
+    ).replace(
+        "Offers, prices and date availability are <strong>not verified</strong>.",
+        "From prices only. <strong>Confirm dates and total price on Viator.</strong>",
+    ).replace(
+        '<a class="decision-card" href="/mara">',
+        '<a class="decision-card" href="/mara#safari-options">',
+    ).replace(
+        "Road or fly-in? Compare the verification checklist, not an unconfirmed headline price.",
+        "Explore 3-day supplier previews. Check dates, total party price and inclusions on Viator before booking.",
+    )
+
+
 def production_mara_html() -> str:
     body = server.MARA_HTML.replace(
-        "KATE has no verified offers or date availability to show.",
-        "Supplier product previews below can help you explore options; date-specific availability is checked on Viator.",
+        "Nairobi to the Maasai Mara:<br><em>road vs fly-in.</em>",
+        "Nairobi to the Maasai Mara:<br><em>3-day safari options.</em>",
+    ).replace(
+        "There is no verified winner here. Compare the complete trip details for your dates before choosing. KATE has no verified offers or date availability to show.",
+        "Browse supplier product previews and from prices for a 3-day safari. Check your dates, full itinerary and total party price on Viator before booking.",
+    ).replace(
+        '<div class="intro-tags">',
+        '<div class="hero-actions mara-intro-actions"><a class="button button-primary" href="#safari-options">See 3-day safari options <span aria-hidden="true">↗</span></a><a class="button button-quiet" href="/planner">Plan my trip</a></div><div class="intro-tags">',
     ).replace(
         "No product ranking, price quote or booking hand-off is available in this preview.",
         "Compare complete trip details. Supplier from prices are not a quote for your dates or group.",
@@ -50,7 +78,7 @@ def production_mara_html() -> str:
         "Add your group size, budget target and comfort preference—without triggering a supplier search.",
         "Add your group size, budget target and comfort preference. Nairobi–Mara plans of 2–4 days can also load supplier product previews.",
     )
-    return body.replace('<section class="mara-cta">', PRODUCTION_OFFERS_HTML + '<section class="mara-cta">')
+    return body.replace('<section class="compare-section">', PRODUCTION_OFFERS_HTML + '<section class="compare-section">')
 
 
 def production_shell(title: str, body: str, current: str) -> bytes:
@@ -91,9 +119,9 @@ def build(destination: Path | str = ROOT / "dist") -> Path:
     (output / "static").mkdir(parents=True, exist_ok=True)
 
     pages = {
-        "index.html": ("Plan your Kenya trip with the details that matter", server.HOME_HTML, "home"),
+        "index.html": ("3-day Maasai Mara safaris from Nairobi", production_home_html(), "home"),
         "planner/index.html": ("Kenya Trip Planner", server.PLANNER_HTML, "planner"),
-        "mara/index.html": ("Nairobi to Maasai Mara: Road vs Fly-in (3 Days)", production_mara_html(), "mara"),
+        "mara/index.html": ("3-day Maasai Mara Safari Options from Nairobi", production_mara_html(), "mara"),
         "control/index.html": ("Control Center", PRODUCTION_CONTROL_HTML, "control"),
     }
     for relative, (title, body, current) in pages.items():
