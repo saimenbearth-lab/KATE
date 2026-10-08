@@ -86,6 +86,14 @@ PRODUCTION_OFFERS_HTML = '''
 
 def production_home_html() -> str:
     return server.HOME_HTML.replace(
+        '<img src="/static/mara-hero.jpg" alt=',
+        '<img src="/.netlify/images?url=/static/mara-hero.jpg&amp;w=960&amp;q=75&amp;fm=webp" '
+        'srcset="/.netlify/images?url=/static/mara-hero.jpg&amp;w=480&amp;q=75&amp;fm=webp 480w, '
+        '/.netlify/images?url=/static/mara-hero.jpg&amp;w=960&amp;q=75&amp;fm=webp 960w, '
+        '/.netlify/images?url=/static/mara-hero.jpg&amp;w=1440&amp;q=75&amp;fm=webp 1440w" '
+        'sizes="(max-width: 650px) calc(100vw - 28px), 550px" width="2560" height="1440" '
+        'fetchpriority="high" decoding="async" alt=',
+    ).replace(
         "Plan your Kenya trip with the details that matter.",
         "Explore 3-day Maasai Mara safaris.",
     ).replace(

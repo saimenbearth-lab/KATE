@@ -286,6 +286,7 @@
   function renderDashboard(data, container) {
     container.replaceChildren();
     container.append(make('h2', 'metrics-intro', 'Recorded activity'));
+    container.append(make('p', 'privacy-note', 'Event counts include checks and automated requests. They do not establish unique visitors or customer interest. Supplier bookings and commission reports are not synchronized automatically.'));
     const eventGrid = make('div', 'metrics-grid');
     const eventLabels = [
       ['page_view', 'Page views'], ['planner_started', 'Planner started'],
@@ -294,17 +295,22 @@
     ];
     eventLabels.forEach(([key, label]) => {
       const n = data.events[key] || 0;
-      eventGrid.append(metricCard(label, n ? String(n) : 'No data yet', 'Persisted events; no projections.'));
+      eventGrid.append(metricCard(label, String(n), 'Recorded events, including test activity.'));
     });
     container.append(eventGrid);
 
     const pageSection = make('section', 'metric-subsection');
     pageSection.append(make('h2', '', 'Page views by page'));
     const pageGrid = make('div', 'metrics-grid');
-    const pageNames = [['/', 'Home'], ['/planner', 'Planner'], ['/mara', 'Mara comparison'], ['/control', 'Control Center']];
+    const pageNames = [
+      ['/', 'Home'], ['/planner', 'Planner'], ['/mara', 'Safari options'], ['/control', 'Control Center'],
+      ['/guides', 'Safari guides'],
+      ['/guides/3-day-masai-mara-safari-from-nairobi', 'Three-day safari guide'],
+      ['/guides/private-vs-shared-masai-mara-safari', 'Private vs shared guide'],
+    ];
     pageNames.forEach(([path, label]) => {
       const n = data.page_views[path] || 0;
-      pageGrid.append(metricCard(label, n ? String(n) : 'No data yet', path));
+      pageGrid.append(metricCard(label, String(n), path));
     });
     pageSection.append(pageGrid);
     container.append(pageSection);
@@ -322,11 +328,11 @@
     const outcomeSection = make('section', 'metric-subsection');
     outcomeSection.append(make('h2', '', 'Commercial outcomes'));
     const outcomeGrid = make('div', 'metrics-grid');
-    outcomeGrid.append(metricCard('Conversions', data.conversions ? String(data.conversions) : 'No data yet', 'No conversion records are inferred.'));
+    outcomeGrid.append(metricCard('Imported conversions', String(data.conversions || 0), 'Evidence-backed records only; supplier reporting is not synchronized.'));
     const revenueValue = data.revenue.length
       ? data.revenue.map((item) => `${item.amount} ${item.currency}`).join(' · ')
-      : 'No data yet';
-    outcomeGrid.append(metricCard('Recorded revenue', revenueValue, data.revenue.length ? 'Stored evidence-backed records only.' : 'No revenue records are present.'));
+      : 'No imported revenue';
+    outcomeGrid.append(metricCard('Imported revenue', revenueValue, data.revenue.length ? 'Stored evidence-backed records; not a payout confirmation.' : 'No evidence-backed revenue report has been imported. This is not a supplier account balance.'));
     outcomeSection.append(outcomeGrid);
     outcomeSection.append(make('p', 'privacy-note', data.note));
     container.append(outcomeSection);
