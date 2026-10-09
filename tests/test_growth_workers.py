@@ -1,6 +1,9 @@
 import hashlib
 import json
 from pathlib import Path
+import re
+import shlex
+import subprocess
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -30,6 +33,45 @@ class GrowthWorkerTests(unittest.TestCase):
         for urls in ([workers.SITE_URL + '/control/'], [workers.SITE_URL + '/planner/'], ['https://example.com/'], [workers.SITE_URL.replace('https:', 'http:') + '/'], [workers.SITE_URL + '/', workers.SITE_URL + '/']):
             with self.subTest(urls=urls), self.assertRaises(ValueError):
                 workers.sitemap_urls(self.sitemap(urls))
+
+    def test_sitemap_accepts_public_language_routes_and_rejects_private_variants(self):
+        urls = [workers.SITE_URL + path for path in ('/', '/de/', '/mara/', '/de/mara/', '/de/guides/')]
+        self.assertEqual(workers.sitemap_urls(self.sitemap(urls)), urls)
+        for path in ('/de/planner/', '/de/control/', '/de/api/control', '/de/%70lanner/', '/%64%65/control/', '/de//control/', '/guides/../control/', '/de/%2e%2e/planner/', '/de/%252e%252e/control/', '/de%5ccontrol/'):
+            with self.subTest(path=path), self.assertRaises(ValueError):
+                workers.sitemap_urls(self.sitemap([workers.SITE_URL + path]))
+
+    def test_private_localized_sitemap_prevents_page_reads_and_notifications(self):
+        _, _, responses = self.fixture()
+        private_url = workers.SITE_URL + '/de/planner/'
+        responses[workers.SITE_URL + '/sitemap.xml'] = (200, self.sitemap([private_url]))
+        with patch.object(workers, 'request', side_effect=lambda url, **kw: responses[url]) as req, self.assertRaises(ValueError):
+            workers.search_discovery('a' * 40, submit=True, state_file='unused.json')
+        self.assertTrue(all(call.args[0] != private_url and 'payload' not in call.kwargs for call in req.call_args_list))
+
+    def test_workflow_content_gate_detects_translation_only_changes_but_not_docs(self):
+        workflow = (workers.ROOT / '.github/workflows/growth-workers.yml').read_text()
+        command = shlex.split(re.search(r'if ! (git diff --quiet .+); then', workflow).group(1))
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / 'scripts').mkdir()
+            localization = root / 'scripts/localization.py'
+            documentation = root / 'notes.md'
+            localization.write_text('original translation\n')
+            documentation.write_text('original documentation\n')
+            def git(*args):
+                return subprocess.run(['git', '-c', 'user.name=KATE Test', '-c', 'user.email=kate-test@example.invalid', *args], cwd=root, check=True, capture_output=True)
+            git('init', '-q')
+            git('add', '.')
+            git('commit', '-qm', 'baseline')
+            localization.write_text('updated translation\n')
+            git('add', '.')
+            git('commit', '-qm', 'translation only')
+            self.assertEqual(subprocess.run(command, cwd=root, capture_output=True).returncode, 1)
+            documentation.write_text('updated documentation\n')
+            git('add', '.')
+            git('commit', '-qm', 'documentation only')
+            self.assertEqual(subprocess.run(command, cwd=root, capture_output=True).returncode, 0)
 
     def test_only_changed_content_is_notified_and_accepted_state_is_saved(self):
         urls, html, responses = self.fixture()
@@ -93,6 +135,26 @@ class GrowthWorkerTests(unittest.TestCase):
                 return 200, b'unsafe'
             return 200, b'<html>page</html>'
         with patch.object(workers, 'request', side_effect=response), self.assertRaisesRegex(ValueError, 'Unauthenticated control'):
+            workers.health_monitor('a' * 40)
+
+    def test_health_checks_both_languages_and_keeps_admin_protection(self):
+        calls = []
+        def response(url, **kw):
+            calls.append(url)
+            self.assertNotIn('payload', kw)
+            if url.endswith('/build.json'):
+                return 200, json.dumps({'commit': 'a' * 40, 'release': 'kate-supplier-preview-v1'}).encode()
+            if url.endswith('/api/health'):
+                return 200, json.dumps({'ok': True, 'viator_configured': True, 'admin_configured': True, 'release': 'kate-supplier-preview-v1'}).encode()
+            if url.endswith('/api/control'):
+                return 401, b'unauthorized'
+            return 200, b'<html>page</html>'
+        with patch.object(workers, 'request', side_effect=response):
+            result = workers.health_monitor('a' * 40)
+        self.assertEqual(result['page_statuses'], '5 public pages returned 200')
+        self.assertTrue({workers.SITE_URL + path for path in ('/de/', '/de/mara/', '/api/control')}.issubset(calls))
+        self.assertEqual(result['unauthenticated_control_status'], 401)
+        with patch.object(workers, 'request', side_effect=lambda url, **kw: (404, b'missing') if url.endswith('/de/mara/') else response(url, **kw)), self.assertRaisesRegex(ValueError, '/de/mara/'):
             workers.health_monitor('a' * 40)
 
     def test_snapshot_keeps_historical_time_and_does_not_turn_clicks_into_customers(self):

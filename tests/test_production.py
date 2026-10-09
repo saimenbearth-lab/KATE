@@ -14,7 +14,7 @@ class ProductionBuildTests(unittest.TestCase):
     def test_german_funnel_has_real_pages_download_and_private_planner_metadata(self):
         with tempfile.TemporaryDirectory(prefix="kate-german-test-") as temp:
             output = build(Path(temp) / "dist")
-            for relative in ("index.html", "mara/index.html", "planner/index.html", "guides/index.html", "resources/safari-booking-checklist/index.html"):
+            for relative in ("index.html", "mara/index.html", "planner/index.html", "guides/index.html", "guides/nairobi-airport-transfers-and-safari-extras/index.html", "resources/safari-booking-checklist/index.html"):
                 html = (output / "de" / relative).read_text()
                 self.assertIn('<html lang="de">', html)
                 self.assertIn('hreflang="en"', html)
@@ -25,6 +25,8 @@ class ProductionBuildTests(unittest.TestCase):
             self.assertFalse((output / "de/control/index.html").exists())
             self.assertIn('BUCHUNGSCHECKLISTE', (output / "de/resources/safari-booking-checklist.txt").read_text())
             self.assertIn('/de/mara/', (output / 'sitemap.xml').read_text())
+            self.assertIn('/de/guides/nairobi-airport-transfers-and-safari-extras/', (output / 'sitemap.xml').read_text())
+            self.assertIn('/guides/nairobi-airport-transfers-and-safari-extras/', (output / 'sitemap.xml').read_text())
 
     def test_cross_sell_uses_existing_supplier_handoff_and_no_public_admin_navigation(self):
         with tempfile.TemporaryDirectory(prefix="kate-extras-test-") as temp:

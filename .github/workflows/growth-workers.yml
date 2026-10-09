@@ -56,7 +56,7 @@ jobs:
           args=()
           if [ "$MAY_SUBMIT" = "true" ]; then
             git rev-parse --verify 'HEAD^' >/dev/null
-            if ! git diff --quiet 'HEAD^' HEAD -- server.py scripts/build_static.py scripts/travel_guides.py scripts/booking_resource.py scripts/sales_assistant.py static netlify.toml indexnow-key.txt; then
+            if ! git diff --quiet 'HEAD^' HEAD -- server.py scripts/build_static.py scripts/travel_guides.py scripts/nairobi_guide.py scripts/booking_resource.py scripts/sales_assistant.py scripts/localization.py static netlify.toml indexnow-key.txt; then
               args+=(--submit)
             fi
           fi

@@ -47,6 +47,20 @@ function post(path, data, secret) {
     body: JSON.stringify(data) });
 }
 
+test('Nairobi guide page views use a separate intent in both languages', async () => {
+  const canonical = '/guides/nairobi-airport-transfers-and-safari-extras';
+  for (const page of [canonical + '/', '/de' + canonical + '/']) {
+    const { handler, calls, fetches } = setup();
+    const response = await handler(post('event', { event_type: 'page_view', page }));
+    assert.equal(response.status, 202);
+    assert.equal(fetches(), 0);
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].value.page, canonical);
+    assert.equal(calls[0].value.intent, 'nairobi_transfer_and_activity_planning');
+    assert.equal(calls[0].value.event_type, 'page_view');
+  }
+});
+
 test('health exposes presence flags without credentials or business data', async () => {
   const s = setup({ vars: { VIATOR_API_KEY: 'private-supplier-key' } });
   const response = await s.handler(new Request('https://kate.example/api/health'));

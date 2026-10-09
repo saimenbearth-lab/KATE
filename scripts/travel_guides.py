@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from html import escape
+from scripts.nairobi_guide import GUIDE as NAIROBI_GUIDE
 
 
 def _faq_section(faqs: tuple[dict[str, str], ...]) -> str:
@@ -150,6 +151,7 @@ PRIVATE_SHARED_BODY = '''
 
 
 GUIDES = (
+    NAIROBI_GUIDE,
     {
         "path": "/guides/3-day-masai-mara-safari-from-nairobi/",
         "title": "3-Day Maasai Mara Safari from Nairobi: Planning Checklist",

@@ -430,6 +430,8 @@
       ['/guides', 'Safari guides'],
       ['/guides/3-day-masai-mara-safari-from-nairobi', 'Three-day safari guide'],
       ['/guides/private-vs-shared-masai-mara-safari', 'Private vs shared guide'],
+      ['/guides/nairobi-airport-transfers-and-safari-extras', 'Nairobi transfers and activities guide'],
+      ['/resources/safari-booking-checklist', 'Booking checklist'],
     ];
     pageNames.forEach(([path, label]) => {
       const n = data.page_views[path] || 0;
