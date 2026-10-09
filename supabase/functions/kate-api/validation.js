@@ -69,7 +69,11 @@ export function validatePlan(data) {
 
 export function validatePageView(data) {
   if (!data || typeof data.page !== "string") return null;
-  const page = data.page.replace(/\/$/, "") || "/";
+  let page = data.page.replace(/\/$/, "") || "/";
+  // Aggregate explicitly supported EN/DE visitor routes under their canonical page.
+  // The private admin page has no translated route.
+  if (page === "/de") page = "/";
+  else if (page.startsWith("/de/") && page !== "/de/control") page = page.slice(3);
   return ALLOWED_PAGES.has(page) ? page : null;
 }
 

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { searchMaraOffers } from '../supabase/functions/kate-api/viator.js';
+import { searchMaraOffers, searchNairobiOffers } from '../supabase/functions/kate-api/viator.js';
 
 const fixture = (code = '427094P4') => ({ productCode: code, title: '3 Days Maasai Mara Safari',
   productUrl: `https://www.viator.com/tours/Nairobi/Mara/d5280-${code}?pid=P00323912&mcid=42383`,
@@ -78,4 +78,67 @@ test('missing credentials and malformed/oversized supplier payloads fail closed'
     await assert.rejects(searchMaraOffers({ apiKey: 'fixture', fetchImpl: async () => new Response(body) }),
       (error) => error.code === 'supplier_invalid_response');
   }
+});
+
+const activityFixture = (code = '56789P1') => ({ ...fixture(code), title: 'Nairobi National Park Morning Tour',
+  status: 'ACTIVE', duration: { fixedDurationInMinutes: 240 } });
+
+test('Nairobi search uses a separate fixed campaign and bounded activity filters with honest durations', async () => {
+  let request;
+  const variable = { ...activityFixture('56789P2'), duration: { fixedDurationInMinutes: null, variableDurationFromMinutes: 180, variableDurationToMinutes: 360 } };
+  const offers = await searchNairobiOffers({ apiKey: 'key-fixture', targetDate: '2026-12-01', fetchImpl: async (url, init) => {
+    request = { url, init }; return respond([activityFixture(), variable])();
+  } });
+  assert.equal(request.url, 'https://api.viator.com/partner/products/search?campaign-value=kate-nairobi');
+  const body = JSON.parse(request.init.body);
+  assert.equal(body.filtering.destination, '5280');
+  assert.deepEqual(body.filtering.durationInMinutes, { from: 1, to: 720 });
+  assert.equal(body.filtering.startDate, '2026-12-01');
+  assert.equal(offers[0].duration_minutes, 240);
+  assert.equal(offers[1].duration_minutes, null);
+  assert.equal(offers[1].duration_min_minutes, 180);
+  assert.equal(offers[1].duration_max_minutes, 360);
+  assert.equal(offers.every((offer) => offer.availability_checked === false), true);
+});
+
+test('Nairobi activities reject unproven, coerced, long and contradictory supplier durations', async () => {
+  const invalid = [undefined, {}, { fixedDurationInMinutes: 0 }, { fixedDurationInMinutes: -1 },
+    { fixedDurationInMinutes: 721 }, { fixedDurationInMinutes: '240' },
+    { variableDurationFromMinutes: 60 }, { variableDurationFromMinutes: 0, variableDurationToMinutes: 120 },
+    { variableDurationFromMinutes: 120, variableDurationToMinutes: 60 },
+    { variableDurationFromMinutes: 60, variableDurationToMinutes: 721 },
+    { variableDurationFromMinutes: '60', variableDurationToMinutes: 120 },
+    { fixedDurationInMinutes: 120, variableDurationFromMinutes: 60, variableDurationToMinutes: 120 }];
+  const offers = await searchNairobiOffers({ apiKey: 'fixture', fetchImpl: respond([
+    ...invalid.map((duration, i) => ({ ...activityFixture(`56789P${i + 10}`), duration })),
+    { ...activityFixture(), duration: { fixedDurationInMinutes: 720, variableDurationFromMinutes: null, variableDurationToMinutes: null } },
+  ]) });
+  assert.deepEqual(offers.map((offer) => offer.product_id), ['56789P1']);
+  assert.equal(offers[0].duration_max_minutes, 720);
+});
+
+test('Nairobi excludes Mara, multi-day, overnight, unrelated and explicitly nonactive catalogue titles', async () => {
+  const titles = ['Nairobi to Maasai Mara', 'Nairobi Masai Mara Safari', 'Nairobi 2-Day Safari',
+    'Three Days Safari from Nairobi', 'Nairobi 1 Night Safari', 'Nairobi Overnight Safari', 'Nairobi multi-day safari', 'Mombasa Walking Tour'];
+  const offers = await searchNairobiOffers({ apiKey: 'fixture', fetchImpl: respond([
+    ...titles.map((title, i) => ({ ...activityFixture(`56789P${i + 10}`), title })),
+    { ...activityFixture('56789P40'), status: 'INACTIVE' }, { ...activityFixture('56789P41'), status: 'DRAFT' }, activityFixture(),
+  ]) });
+  assert.deepEqual(offers.map((offer) => offer.product_id), ['56789P1']);
+});
+
+test('Nairobi retains strict affiliate URL and price/currency type protections', async () => {
+  const unsafe = [
+    'http://www.viator.com/tours/Nairobi/a/d5280-56789P1?pid=P00323912',
+    'https://evil.example/tours/Nairobi/a/d5280-56789P1?pid=P00323912',
+    'https://www.viator.com/tours/Nairobi/a/d5280-OTHER?pid=P00323912',
+    'https://www.viator.com/tours/Nairobi/a/d5280-56789P1?pid=P00323912&pid=P1',
+  ].map((productUrl) => ({ ...activityFixture(), productUrl }));
+  const missingPrice = { ...activityFixture(), pricing: { summary: { fromPrice: '100' }, currency: 'USD' } };
+  const wrongCurrency = { ...activityFixture('56789P2'), pricing: { summary: { fromPrice: 100 }, currency: 'EUR' } };
+  const negativePrice = { ...activityFixture('56789P3'), pricing: { summary: { fromPrice: -1 }, currency: 'USD' } };
+  const offers = await searchNairobiOffers({ apiKey: 'fixture', fetchImpl: respond([...unsafe, missingPrice, wrongCurrency, negativePrice]) });
+  assert.deepEqual(offers.map((offer) => offer.product_id), ['56789P1', '56789P2', '56789P3']);
+  assert.equal(offers.every((offer) => offer.from_price === null), true);
+  await assert.rejects(searchNairobiOffers({ apiKey: 'fixture', currency: 'XYZ', fetchImpl: respond([]) }), (error) => error.code === 'supplier_invalid_request');
 });

@@ -1,5 +1,5 @@
 import { buildItinerary, validatePageView, validatePlan } from "./validation.js";
-import { searchMaraOffers } from "./viator.js";
+import { searchMaraOffers, searchNairobiOffers } from "./viator.js";
 
 export function createHandler({ dbFactory, env, fetchImpl = fetch }) {
   const MAX_BODY_BYTES = 8192;
@@ -143,6 +143,8 @@ export function createHandler({ dbFactory, env, fetchImpl = fetch }) {
 
   async function catalogueOffers(db, request) {
     const params = new URL(request.url).searchParams;
+    const category = params.get("category") ?? "mara";
+    if (!["mara", "nairobi"].includes(category)) return jsonResponse(400, { error: "Choose a supported offer category." });
     const currency = params.get("currency") || "USD";
     if (!["USD", "EUR", "GBP", "CHF"].includes(currency)) return jsonResponse(400, { error: "Choose a supported currency." });
     const rawDays = params.get("days") || "3";
@@ -157,7 +159,8 @@ export function createHandler({ dbFactory, env, fetchImpl = fetch }) {
         return jsonResponse(400, { error: "Choose a valid travel date within the next year." });
       }
     }
-    const key = `viator_offers:${currency}:${days}:${targetDate || "any"}`;
+    const key = category === "nairobi" ? `viator_offers:nairobi:${currency}:1-720:${targetDate || "any"}`
+      : `viator_offers:${currency}:${days}:${targetDate || "any"}`;
     const cached = await db.from("business_memory").select("value,updated_at").eq("key", key).maybeSingle();
     if (cached.error) return jsonResponse(503, { error: "Safari options are temporarily unavailable." });
     if (cached.data && Date.now() - Date.parse(cached.data.updated_at) < OFFER_TTL_MS) {
@@ -170,7 +173,8 @@ export function createHandler({ dbFactory, env, fetchImpl = fetch }) {
     if (!lease.data) return jsonResponse(429, { error: "Safari options are being refreshed. Please try again shortly." });
     let offers;
     try {
-      offers = await searchMaraOffers({ apiKey, currency, targetDate, days, fetchImpl });
+      const search = category === "nairobi" ? searchNairobiOffers : searchMaraOffers;
+      offers = await search({ apiKey, currency, targetDate, days, fetchImpl });
     } catch (error) {
       const status = error.code === "supplier_rate_limit" ? 429 : 503;
       return jsonResponse(status, { error: "Safari options could not be loaded from Viator. Please try again later." });
@@ -184,8 +188,8 @@ export function createHandler({ dbFactory, env, fetchImpl = fetch }) {
         .select("product_id,search_partition,snapshot_context").eq("product_id", offer.product_id).maybeSingle()));
       if (previous.some((result) => result.error)) return jsonResponse(503, { error: "Safari options are temporarily unavailable." });
       const rows = offers.map((offer, index) => ({
-        product_id: offer.product_id, comparison_id: `nairobi-mara-${days}day`, search_partition: previous[index].data?.search_partition || "unresolved",
-        provider: "Viator", product_name: offer.title, destination_text: "Nairobi / Maasai Mara, Kenya", category: "safari",
+        product_id: offer.product_id, comparison_id: category === "nairobi" ? "nairobi-short-activities" : `nairobi-mara-${days}day`, search_partition: previous[index].data?.search_partition || "unresolved",
+        provider: "Viator", product_name: offer.title, destination_text: category === "nairobi" ? "Nairobi, Kenya" : "Nairobi / Maasai Mara, Kenya", category: category === "nairobi" ? "activity" : "safari",
         from_price: offer.from_price, currency: offer.currency, price_basis_confirmed: false,
         date_availability_confirmed: false, availability_state: "unverified",
         affiliate_url: offer.affiliate_url, affiliate_state: "approved", source_last_checked: offer.checked_at,
@@ -193,13 +197,15 @@ export function createHandler({ dbFactory, env, fetchImpl = fetch }) {
         confidence_note: "Active supplier catalogue listing; final travel-date availability and party price are confirmed on Viator.",
         snapshot_context: { ...(previous[index].data?.snapshot_context || {}), record_state: "active_catalogue_preview",
           catalogue_status: "ACTIVE", catalogue_source: "viator_products_search", approved_pid: APPROVED_PID,
-          target_date_filter: targetDate, duration_minutes: offer.duration_minutes, price_basis: "supplier_from_price" },
+          target_date_filter: targetDate, duration_minutes: offer.duration_minutes, price_basis: "supplier_from_price",
+          ...(category === "nairobi" ? { offer_category: "nairobi", comparison_context: "nairobi_optional_extras",
+            duration_min_minutes: offer.duration_min_minutes, duration_max_minutes: offer.duration_max_minutes } : {}) },
       }));
       const saved = await db.from("products").upsert(rows, { onConflict: "product_id" });
       if (saved.error) return jsonResponse(503, { error: "Safari options could not be saved. Please try again." });
     }
     const publicOffers = offers.map(({ affiliate_url, ...offer }) => offer);
-    const payload = { offers: publicOffers, availability_checked: false,
+    const payload = { offers: publicOffers, availability_checked: false, category,
       message: "Supplier catalogue options. From prices are indicative; confirm your travel dates, party price and availability on Viator." };
     const stored = await db.from("business_memory").upsert({ key, value: JSON.stringify(payload), updated_at: new Date().toISOString() }, { onConflict: "key" });
     if (stored.error) return jsonResponse(503, { error: "Safari options could not be saved. Please try again." });

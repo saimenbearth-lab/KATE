@@ -20,11 +20,12 @@ import server  # noqa: E402
 from scripts.travel_guides import GUIDES  # noqa: E402
 from scripts.sales_assistant import ADVISOR_HTML  # noqa: E402
 from scripts.booking_resource import RESOURCE, CHECKLIST_MARKDOWN  # noqa: E402
+from scripts.localization import localize_html, language_selector, localized_path, CHECKLIST_DE  # noqa: E402
 
 SITE_URL = "https://kate-kenya-trip-planner.netlify.app"
 PAGE_PATHS = {"home": "/", "planner": "/planner/", "mara": "/mara/", "control": "/control/", "guides": "/guides/"}
 DESCRIPTIONS = {
-    "home": "Explore three-day Maasai Mara safari options from Nairobi. Compare supplier from prices and confirm your travel dates and full party price on Viator.",
+    "home": "Compare two-, three- and four-day Maasai Mara safaris from Nairobi. Explore supplier from prices and optional Nairobi activities, then confirm dates and total party prices on Viator.",
     "mara": "Browse three-day Maasai Mara safari previews from Nairobi, compare road and fly-in planning, and check itinerary details and final prices on Viator.",
     "planner": "Build a Kenya trip planning outline with your dates, group size and preferences. Confirm supplier availability and total prices separately.",
     "control": "Private KATE operations dashboard.",
@@ -87,9 +88,25 @@ PRODUCTION_OFFERS_HTML = '''
 '''
 PRODUCTION_OFFERS_HTML = re.sub(r'<div class="offer-controls">.*?</div>', ADVISOR_HTML, PRODUCTION_OFFERS_HTML, count=1, flags=re.S).replace('<h2>3-day Maasai Mara safari options</h2>', '<h2 data-offers-title>3-day Maasai Mara safari options</h2>')
 
+NAIROBI_EXTRAS_HTML = '''
+<section class="offers-section" id="nairobi-extras" data-offers data-offer-category="nairobi" data-nosnippet>
+<p class="section-kicker">Short activities, separate bookings</p>
+<h2>Nairobi activities before or after your safari</h2>
+<p class="offer-disclosure">Browse short supplier-listed activities in Nairobi. Check your dates, pickup location, transfer times and total party price on Viator before adding one to your trip.</p>
+<div class="offer-controls"><label class="field"><span>Price currency</span><select data-offer-currency><option>USD</option><option>EUR</option><option>GBP</option><option>CHF</option></select></label><button class="button button-primary" type="button" data-offers-load>Show Nairobi activities</button></div>
+<p class="offer-status" data-offers-status role="status">Load supplier previews to see from prices. Date-specific availability has not been checked.</p><div class="offer-grid" data-offers-results></div>
+<p class="offer-disclosure">These are separate bookings, not included in a safari. Confirm timing, pickup and any extra fees with each supplier.</p>
+<p class="offer-disclosure">Affiliate disclosure: KATE may earn a commission if you book through a Viator link.</p>
+</section>
+'''
+
+HOME_EXTRAS_HTML = '''
+<section class="trip-extras"><div><p class="section-kicker">Nairobi extras</p><h2>Add a Nairobi experience</h2><p>Browse short supplier-listed activities in Nairobi. Check your dates, pickup location, transfer times and total party price on Viator before adding one to your trip.</p></div><a class="button button-quiet" href="/mara/#nairobi-extras">Explore short Nairobi activities <span aria-hidden="true">↗</span></a></section>
+'''
+
 
 def production_home_html() -> str:
-    return server.HOME_HTML.replace(
+    body = server.HOME_HTML.replace(
         '<img src="/static/mara-hero.jpg" alt=',
         '<img src="/.netlify/images?url=/static/mara-hero.jpg&amp;w=960&amp;q=75&amp;fm=webp" '
         'srcset="/.netlify/images?url=/static/mara-hero.jpg&amp;w=480&amp;q=75&amp;fm=webp 480w, '
@@ -99,13 +116,13 @@ def production_home_html() -> str:
         'fetchpriority="high" decoding="async" alt=',
     ).replace(
         "Plan your Kenya trip with the details that matter.",
-        "Explore 3-day Maasai Mara safaris.",
+        "Compare 2–4-day Maasai Mara safaris.",
     ).replace(
         "Start with your travel preferences. For one focused decision, compare road and fly-in planning for a 3-day Nairobi–Maasai Mara trip.",
         "Start in Nairobi. Browse supplier product previews and from prices, then check your dates, itinerary and full party price on Viator.",
     ).replace(
         '<div class="hero-actions"><a class="button button-primary" href="/planner">Start your Kenya trip plan <span aria-hidden="true">↗</span></a><a class="button button-quiet" href="/mara">Compare road vs fly-in</a></div>',
-        '<div class="hero-actions"><a class="button button-primary" href="/mara/#safari-options">See 3-day safari options <span aria-hidden="true">↗</span></a><a class="button button-quiet" href="/planner">Plan my trip</a></div>',
+        '<div class="hero-actions"><a class="button button-primary" href="/mara/#safari-options">Compare safari options <span aria-hidden="true">↗</span></a><a class="button button-quiet" href="/planner">Plan my trip</a></div>',
     ).replace(
         "Offers, prices and date availability are <strong>not verified</strong>.",
         "From prices only. <strong>Confirm dates and total price on Viator.</strong>",
@@ -116,6 +133,10 @@ def production_home_html() -> str:
         "Road or fly-in? Compare the verification checklist, not an unconfirmed headline price.",
         "Explore 3-day supplier previews. Check dates, total party price and inclusions on Viator before booking.",
     )
+    body = body.replace('KENYA TRIP PLANNING · PREVIEW', 'KENYA SAFARI PLANNING')
+    body = body.replace('KATE helps frame what to check next—not what to book. Set your trip inputs, then compare the details that matter for your dates.', 'Choose your safari length, compare supplier from prices and use the checklist to confirm the details before booking.')
+    body = body.replace('Preview, not a booking service.', 'Bookings handled by Viator.')
+    return body.replace('<section class="disclosure-strip">', HOME_EXTRAS_HTML + '<section class="disclosure-strip">')
 
 
 def production_mara_html() -> str:
@@ -138,14 +159,16 @@ def production_mara_html() -> str:
         "Add your group size, budget target and comfort preference—without triggering a supplier search.",
         "Add your group size, budget target and comfort preference. Nairobi–Mara plans of 2–4 days can also load supplier product previews.",
     )
-    return body.replace('<section class="compare-section">', PRODUCTION_OFFERS_HTML + '<section class="compare-section">')
+    body = body.replace('<section class="compare-section">', PRODUCTION_OFFERS_HTML + '<section class="compare-section">')
+    return body + NAIROBI_EXTRAS_HTML
 
 
-def production_shell(title: str, body: str, current: str, *, path: str | None = None, description: str | None = None, article: bool = False) -> bytes:
+def production_shell(title: str, body: str, current: str, *, path: str | None = None, description: str | None = None, article: bool = False, language: str = "en") -> bytes:
+    page_path = path or PAGE_PATHS.get(current, "/")
     html = server.shell(title, body, current).decode("utf-8")
     html = html.replace(
         '<div class="preview-ribbon"><span>PREVIEW BUILD</span><span>Not a production-ready sales page · No live inventory or booking</span></div>',
-        '<div class="preview-ribbon"><span>PLANNING PREVIEW</span><span>Supplier previews · Confirm dates and total price on Viator</span></div>',
+        '<div class="preview-ribbon"><span>SAFARI PLANNING</span><span>Supplier previews · Confirm dates and total price on Viator</span></div>',
     )
     html = html.replace(
         "Your entries stay in this local preview database and are not shared with suppliers.",
@@ -177,6 +200,12 @@ def production_shell(title: str, body: str, current: str, *, path: str | None = 
     html = html.replace('<div class="footer-links">', '<div class="footer-links"><a href="' + RESOURCE["path"] + '">Free booking checklist</a>')
     if 'data-copy-template' in body:
         html = html.replace('</head>', '<script src="/static/resources.js" defer></script></head>')
+    if current != 'control':
+        html = html.replace('<a href="/control">Control Center</a>', '')
+        html = html.replace('>3-day Mara</a>', '>Safari options</a>')
+        html = html.replace('</nav></header>', '</nav>' + language_selector(page_path, language) + '</header>')
+        html = html.replace('<script defer src="/static/app.js">', '<script defer src="/static/i18n.js"></script><script defer src="/static/app.js">')
+        html = localize_html(html, page_path, language)
     return html.encode("utf-8")
 
 
@@ -187,7 +216,7 @@ def build(destination: Path | str = ROOT / "dist") -> Path:
     (output / "static").mkdir(parents=True, exist_ok=True)
 
     pages = {
-        "index.html": ("3-day Maasai Mara safaris from Nairobi", production_home_html(), "home"),
+        "index.html": ("2–4-day Maasai Mara safaris from Nairobi", production_home_html(), "home"),
         "planner/index.html": ("Kenya Trip Planner", server.PLANNER_HTML, "planner"),
         "mara/index.html": ("3-day Maasai Mara Safari Options from Nairobi", production_mara_html(), "mara"),
         "control/index.html": ("Control Center", PRODUCTION_CONTROL_HTML, "control"),
@@ -197,25 +226,37 @@ def build(destination: Path | str = ROOT / "dist") -> Path:
         target = output / relative
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(production_shell(title, body, current))
+        if current != 'control':
+            german = output / 'de' / relative
+            german.parent.mkdir(parents=True, exist_ok=True)
+            german.write_bytes(production_shell(title, body, current, language="de"))
 
     for guide in GUIDES:
         target = output / guide["path"].strip("/") / "index.html"
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(production_shell(guide["title"], guide["body"], "guide", path=guide["path"], description=guide["description"], article=True))
+        german = output / 'de' / guide["path"].strip("/") / "index.html"
+        german.parent.mkdir(parents=True, exist_ok=True)
+        german.write_bytes(production_shell(guide["title"], guide["body"], "guide", path=guide["path"], description=guide["description"], article=True, language="de"))
 
     target = output / RESOURCE["path"].strip("/") / "index.html"
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_bytes(production_shell(RESOURCE["title"], RESOURCE["body"], "resource", path=RESOURCE["path"], description=RESOURCE["description"]))
+    german = output / 'de' / RESOURCE["path"].strip("/") / "index.html"
+    german.parent.mkdir(parents=True, exist_ok=True)
+    german.write_bytes(production_shell(RESOURCE["title"], RESOURCE["body"], "resource", path=RESOURCE["path"], description=RESOURCE["description"], language="de"))
     (output / "resources/safari-booking-checklist.txt").write_text(CHECKLIST_MARKDOWN, encoding="utf-8")
+    (output / "de/resources/safari-booking-checklist.txt").write_text(CHECKLIST_DE, encoding="utf-8")
 
     public_paths = ["/", "/mara/", "/guides/", *(guide["path"] for guide in GUIDES), RESOURCE["path"]]
+    public_paths += [localized_path(path, 'de') for path in public_paths.copy()]
     write_search_files(output, public_paths)
     key = (ROOT / "indexnow-key.txt").read_text().strip()
     if not re.fullmatch(r"[a-f0-9]{32}", key):
         raise ValueError("Invalid IndexNow ownership key")
     (output / (key + ".txt")).write_text(key + "\n")
 
-    for asset in ("app.css", "app.js", "resources.js", "mara-hero.jpg"):
+    for asset in ("app.css", "app.js", "resources.js", "i18n.js", "mara-hero.jpg"):
         shutil.copy2(ROOT / "static" / asset, output / "static" / asset)
     (output / "build.json").write_text(json.dumps({
         "commit": os.environ.get("COMMIT_REF") or os.environ.get("COMMIT"),
@@ -229,7 +270,7 @@ def write_search_files(output: Path, public_paths: list[str]) -> None:
     urls = "".join(f'<url><loc>{escape(SITE_URL + path)}</loc></url>' for path in public_paths)
     (output / "sitemap.xml").write_text('<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' + urls + '</urlset>\n')
     preview = os.environ.get("CONTEXT") in {"deploy-preview", "branch-deploy"}
-    rules = "User-agent: *\nDisallow: /\n" if preview else "User-agent: *\nAllow: /\nDisallow: /control\nDisallow: /planner\nDisallow: /api/\n"
+    rules = "User-agent: *\nDisallow: /\n" if preview else "User-agent: *\nAllow: /\nDisallow: /control\nDisallow: /planner\nDisallow: /de/planner\nDisallow: /api/\n"
     (output / "robots.txt").write_text(rules + f'Sitemap: {SITE_URL}/sitemap.xml\n')
 
 
@@ -238,7 +279,7 @@ def main() -> int:
     parser.add_argument("--output", default=str(ROOT / "dist"), help="Output directory (default: dist)")
     args = parser.parse_args()
     output = build(args.output)
-    print(f"Built {6 + len(GUIDES)} KATE pages and 4 static assets into {output}")
+    print(f"Built {11 + 2 * len(GUIDES)} KATE pages and 5 static assets into {output}")
     return 0
 
 

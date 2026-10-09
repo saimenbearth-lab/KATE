@@ -30,6 +30,12 @@
     X-Robots-Tag = "noindex"
 
 [[headers]]
+  for = "/de/resources/safari-booking-checklist.txt"
+  [headers.values]
+    Content-Disposition = 'attachment; filename="safari-booking-checklist-de.txt"'
+    X-Robots-Tag = "noindex"
+
+[[headers]]
   for = "/*.html"
   [headers.values]
     Cache-Control = "no-cache, no-store, must-revalidate"

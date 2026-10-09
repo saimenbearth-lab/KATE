@@ -1,4 +1,4 @@
-const API_URL = 'https://api.viator.com/partner/products/search?campaign-value=kate-mara';
+const API_URL = 'https://api.viator.com/partner/products/search';
 const CURRENCIES = new Set(['USD', 'EUR', 'GBP', 'CHF']);
 const MAX_RESPONSE_BYTES = 2 * 1024 * 1024;
 
@@ -41,16 +41,34 @@ async function boundedJson(response) {
   catch { throw supplierError('supplier_invalid_response'); }
 }
 
-export async function searchMaraOffers({ apiKey, currency = 'USD', targetDate = null, days = 3, fetchImpl = fetch }) {
+function activityDuration(duration) {
+  const fixed = duration?.fixedDurationInMinutes;
+  const minimum = duration?.variableDurationFromMinutes;
+  const maximum = duration?.variableDurationToMinutes;
+  if (fixed != null) {
+    if (!Number.isFinite(fixed) || fixed <= 0 || fixed > 720 || minimum != null || maximum != null) return null;
+    return { duration_minutes: fixed, duration_min_minutes: fixed, duration_max_minutes: fixed };
+  }
+  if (!Number.isFinite(minimum) || !Number.isFinite(maximum) || minimum <= 0 || maximum < minimum || maximum > 720) return null;
+  return { duration_minutes: null, duration_min_minutes: minimum, duration_max_minutes: maximum };
+}
+
+function nairobiActivityTitle(title) {
+  return /\bnairobi\b/i.test(title)
+    && !/\b(?:masai|maasai)\s+mara\b|\bmara\b|\bovernight\b|\bmulti[ -]?day\b|\b(?:[2-9]|\d{2,}|two|three|four|five|six|seven|eight|nine|ten)[ -]*days?\b|\b(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten)[ -]*nights?\b/i.test(title);
+}
+
+async function searchOffers({ apiKey, currency = 'USD', targetDate = null, days = 3, category, fetchImpl = fetch }) {
   if (typeof apiKey !== 'string' || !apiKey.trim()) throw supplierError('supplier_key_missing');
   if (!CURRENCIES.has(currency)) throw supplierError('supplier_invalid_request');
-  if (![2, 3, 4].includes(days)) throw supplierError('supplier_invalid_request');
+  if (category === 'mara' && ![2, 3, 4].includes(days)) throw supplierError('supplier_invalid_request');
   if (targetDate && !/^\d{4}-\d{2}-\d{2}$/.test(targetDate)) throw supplierError('supplier_invalid_request');
-  const filtering = { destination: '5280', durationInMinutes: { from: days * 1440, to: days * 1440 } };
+  const filtering = { destination: '5280', durationInMinutes: category === 'nairobi'
+    ? { from: 1, to: 720 } : { from: days * 1440, to: days * 1440 } };
   if (targetDate) Object.assign(filtering, { startDate: targetDate, endDate: targetDate });
   let response;
   try {
-    response = await fetchImpl(API_URL, {
+    response = await fetchImpl(`${API_URL}?campaign-value=kate-${category}`, {
       method: 'POST', redirect: 'error', signal: AbortSignal.timeout(15000),
       headers: { 'exp-api-key': apiKey, 'Accept': 'application/json;version=2.0',
         'Accept-Language': 'en-US', 'Content-Type': 'application/json' },
@@ -74,12 +92,16 @@ export async function searchMaraOffers({ apiKey, currency = 'USD', targetDate = 
     const id = product?.productCode;
     const title = product?.title;
     if (typeof id !== 'string' || !/^[A-Za-z0-9_-]{1,80}$/.test(id) || seen.has(id)
-      || typeof title !== 'string' || !/\b(?:masai|maasai)\s+mara\b/i.test(title)
+      || typeof title !== 'string' || !(category === 'nairobi' ? nairobiActivityTitle(title) : /\b(?:masai|maasai)\s+mara\b/i.test(title))
       || product.status === 'INACTIVE') continue;
+    // Search serves active catalogue entries. If a status is explicitly supplied,
+    // a Nairobi activity must not contradict that active-catalogue provenance.
+    if (category === 'nairobi' && product.status !== undefined && product.status !== 'ACTIVE') continue;
     const url = affiliateUrl(product.productUrl, id);
     if (!url) continue;
     const minutes = product.duration?.fixedDurationInMinutes;
-    if (Number.isFinite(minutes) && minutes !== days * 1440) continue;
+    const activity = category === 'nairobi' ? activityDuration(product.duration) : null;
+    if (category === 'nairobi' ? !activity : Number.isFinite(minutes) && minutes !== days * 1440) continue;
     const price = product.pricing?.summary?.fromPrice;
     const supplierCurrency = product.pricing?.currency;
     const rating = product.reviews?.combinedAverageRating;
@@ -88,10 +110,19 @@ export async function searchMaraOffers({ apiKey, currency = 'USD', targetDate = 
     offers.push({ product_id: id, title: title.slice(0, 300), affiliate_url: url,
       from_price: supplierCurrency === currency && Number.isFinite(price) && price >= 0 ? price : null,
       currency, duration_minutes: Number.isFinite(minutes) && minutes > 0 ? minutes : null,
+      ...(activity || {}),
       rating: Number.isFinite(rating) && rating >= 0 && rating <= 5 ? rating : null,
       review_count: Number.isInteger(reviewCount) && reviewCount >= 0 ? reviewCount : null,
       checked_at: checkedAt, availability_checked: false, price_basis: 'supplier_from_price' });
     if (offers.length === 3) break;
   }
   return offers;
+}
+
+export async function searchMaraOffers(options) {
+  return searchOffers({ ...options, category: 'mara' });
+}
+
+export async function searchNairobiOffers(options) {
+  return searchOffers({ ...options, category: 'nairobi' });
 }
