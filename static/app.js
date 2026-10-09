@@ -1,8 +1,40 @@
 (() => {
+  const t = (text, params = {}) => window.KATE_I18N?.t
+    ? window.KATE_I18N.t(text, params)
+    : String(text).replace(/\{(\w+)\}/g, (match, key) => params[key] ?? match);
+  const locale = () => window.KATE_I18N?.locale || 'en';
+  const currencies = new Set(['USD', 'EUR', 'GBP', 'CHF']);
+  const currencyControls = new Set();
+  let preferredCurrency = null;
+  try {
+    const saved = window.localStorage?.getItem('kate_currency');
+    if (currencies.has(saved)) preferredCurrency = saved;
+  } catch (_) { /* Currency controls also work when browser storage is unavailable. */ }
+  function registerCurrency(control, changed = () => {}) {
+    if (!preferredCurrency && currencies.has(control.value)) preferredCurrency = control.value;
+    if (preferredCurrency) control.value = preferredCurrency;
+    currencyControls.add({ control, changed });
+    control.addEventListener('change', () => {
+      if (!currencies.has(control.value)) {
+        control.value = preferredCurrency || 'USD';
+        return;
+      }
+      preferredCurrency = control.value;
+      try { window.localStorage?.setItem('kate_currency', preferredCurrency); } catch (_) {}
+      currencyControls.forEach((entry) => {
+        if (entry.control.isConnected === false) {
+          currencyControls.delete(entry);
+          return;
+        }
+        entry.control.value = preferredCurrency;
+        entry.changed();
+      });
+    });
+  }
   const make = (tag, className, text) => {
     const node = document.createElement(tag);
     if (className) node.className = className;
-    if (text !== undefined) node.textContent = text;
+    if (text !== undefined) node.textContent = t(text);
     return node;
   };
 
@@ -11,13 +43,14 @@
     const errorBox = document.querySelector('[data-form-error]');
     const output = document.querySelector('[data-plan-output]');
     const submit = form.querySelector('button[type="submit"]');
+    registerCurrency(form.elements.currency);
     form.addEventListener('submit', async (event) => {
       event.preventDefault();
       errorBox.hidden = true;
       output.hidden = true;
       if (!form.reportValidity()) return;
       submit.disabled = true;
-      submit.textContent = 'Preparing outline…';
+      submit.textContent = t('Preparing outline…');
       const checked = [...form.querySelectorAll('input[name="interests"]:checked')].map((node) => node.value);
       const rawBudget = form.elements.budget.value.trim();
       const payload = {
@@ -44,11 +77,13 @@
         output.hidden = false;
         output.scrollIntoView({ behavior: 'smooth', block: 'start' });
       } catch (error) {
-        errorBox.textContent = error.message || 'We could not prepare this planning view. No availability or booking was checked. Try again or open the comparison page.';
+        errorBox.textContent = t(error.message || 'We could not prepare this planning view. No availability or booking was checked. Try again or open the comparison page.');
         errorBox.hidden = false;
       } finally {
         submit.disabled = false;
-        submit.innerHTML = 'Build my planning outline <span aria-hidden="true">↗</span>';
+        const arrow = make('span', '', '↗');
+        arrow.setAttribute('aria-hidden', 'true');
+        submit.replaceChildren(document.createTextNode(t('Build my planning outline ')), arrow);
       }
     });
   }
@@ -58,16 +93,16 @@
     const card = make('section', 'output-card');
     const head = make('div', 'output-head');
     const titleWrap = make('div');
-    titleWrap.append(make('h2', '', `${data.planning_inputs.days}-day planning outline`));
+    titleWrap.append(make('h2', '', t('{days}-day planning outline', { days: data.planning_inputs.days })));
     titleWrap.append(make('p', '', 'A useful structure to verify with a provider—not a supplier itinerary.'));
     head.append(titleWrap, make('span', 'output-label', 'PLANNING OUTLINE'));
     card.append(head);
 
     const chips = make('div', 'input-chips');
     const inputs = data.planning_inputs;
-    [inputs.origin, inputs.focus, `${inputs.travelers} traveler${inputs.travelers === 1 ? '' : 's'}`,
-      inputs.budget ? `Budget target: ${inputs.budget.amount} ${inputs.budget.currency} p.p.` : 'Budget target not set',
-      `Comfort: ${inputs.comfort.replaceAll('_', ' ')}`,
+    [inputs.origin, inputs.focus, t(inputs.travelers === 1 ? '{count} traveler' : '{count} travelers', { count: inputs.travelers }),
+      inputs.budget ? t('Budget target: {amount} {currency} p.p.', { amount: new Intl.NumberFormat(locale()).format(inputs.budget.amount), currency: inputs.budget.currency }) : 'Budget target not set',
+      t('Comfort: {comfort}', { comfort: t(inputs.comfort.replaceAll('_', ' ')) }),
       ...(inputs.interests.length ? inputs.interests.map((x) => x.replaceAll('_', ' ')) : [])]
       .forEach((value) => chips.append(make('span', '', value)));
     card.append(chips);
@@ -85,15 +120,15 @@
     const notice = make('div', 'output-notice');
     const noticeText = make('div');
     const strong = make('strong', '', 'Planning outline only. ');
-    noticeText.append(strong, document.createTextNode('Confirm itinerary, total party price and date-specific availability directly with the provider.'));
+    noticeText.append(strong, document.createTextNode(t('Confirm itinerary, total party price and date-specific availability directly with the provider.')));
     notice.append(make('span', 'trust-icon', 'i'), noticeText);
     card.append(notice);
 
     const actions = make('div', 'output-actions');
     const mara = make('a', 'button button-primary', 'Compare road vs fly-in ↗');
-    mara.href = '/mara';
+    mara.href = window.KATE_I18N?.path?.('/mara') || '/mara';
     const home = make('a', 'button button-quiet', 'Back to KATE');
-    home.href = '/';
+    home.href = window.KATE_I18N?.path?.('/') || '/';
     actions.append(mara, home);
     card.append(actions);
     container.append(card);
@@ -140,6 +175,7 @@
   }
 
   function setupOffers(section, sourcePage, targetDate = '', days = 3) {
+    const category = section.getAttribute('data-offer-category') === 'nairobi' ? 'nairobi' : 'mara';
     const currency = section.querySelector('[data-offer-currency]');
     const tripLength = section.querySelector('[data-offer-days]');
     const priority = section.querySelector('[data-offer-priority]');
@@ -150,6 +186,10 @@
     const results = section.querySelector('[data-offers-results]');
     const controls = [button, currency, tripLength, priority].filter(Boolean);
     let loading = false;
+    let hasRequested = false;
+    let requestCurrency = currency.value;
+    let generation = 0;
+    let controller;
     const updateChecklist = () => {
       if (!checklist || !priority) return;
       const checks = [
@@ -174,31 +214,49 @@
     };
     if (priority) priority.addEventListener('change', updateChecklist);
     updateChecklist();
-    const load = async () => {
-      if (loading) return;
+    const load = async (replace = false) => {
+      if (loading && replace !== true) return;
+      const current = ++generation;
+      const isCurrent = () => current === generation;
+      controller?.abort();
+      controller = typeof AbortController === 'function' ? new AbortController() : null;
+      const signal = controller?.signal;
       loading = true;
+      hasRequested = true;
+      requestCurrency = currency.value;
+
       controls.forEach((control) => { control.disabled = true; });
       updateChecklist();
       results.replaceChildren();
-      status.textContent = 'Loading supplier product previews…';
+      status.textContent = t('Loading supplier product previews…');
       const selectedDays = tripLength ? Number(tripLength.value) : days;
-      const params = new URLSearchParams({ currency: currency.value, days: String(selectedDays) });
+      const params = new URLSearchParams({ currency: requestCurrency });
+      if (category === 'nairobi') params.set('category', 'nairobi');
+      else params.set('days', String(selectedDays));
       if (assistant) {
         const heading = section.querySelector('[data-offers-title]');
-        if (heading) heading.textContent = `${selectedDays}-day Maasai Mara safari options`;
+        if (heading) heading.textContent = t('{days}-day Maasai Mara safari options', { days: selectedDays });
       }
       if (targetDate) params.set('target_date', targetDate);
       try {
-        const request = () => fetch(`/api/offers?${params}`, { headers: { Accept: 'application/json' } });
+        const request = () => fetch(`/api/offers?${params}`, { headers: { Accept: 'application/json' }, ...(signal ? { signal } : {}) });
         let response = await request();
+        if (!isCurrent()) return;
         if (response.status === 429) {
-          status.textContent = 'Safari options are busy. Waiting a few seconds, then trying once more…';
+          status.textContent = t(category === 'nairobi'
+            ? 'Nairobi activities are busy. Waiting a few seconds, then trying once more…'
+            : 'Safari options are busy. Waiting a few seconds, then trying once more…');
           await new Promise((resolve) => setTimeout(resolve, 6000));
+          if (!isCurrent()) return;
           response = await request();
         }
+        if (!isCurrent()) return;
         const data = await response.json();
+        if (!isCurrent()) return;
         if (!response.ok) throw new Error(response.status === 429
-          ? 'Safari options are still busy. Please try again shortly.'
+          ? category === 'nairobi'
+            ? 'Nairobi activities are still busy. Please try again shortly.'
+            : 'Safari options are still busy. Please try again shortly.'
           : response.status === 503
             ? 'Product previews are currently unavailable. You can still use the planning guide.'
             : 'Product previews could not be loaded. Please try again later.');
@@ -210,16 +268,21 @@
           offers.sort((left, right) => price(left) - price(right));
         }
         offers.forEach((offer) => results.append(renderOffer(offer, sourcePage)));
-        status.textContent = data.offers.length
+        status.textContent = t(data.offers.length
           ? 'From prices only. Date-specific availability and the price for your party have not been checked.'
-          : 'No supplier previews found. Date-specific availability has not been checked.';
+          : 'No supplier previews found. Date-specific availability has not been checked.');
       } catch (error) {
-        status.textContent = error.message || 'Product previews are currently unavailable.';
+        if (!isCurrent()) return;
+        status.textContent = t(error.message || 'Product previews are currently unavailable.');
       } finally {
+        if (!isCurrent()) return;
         controls.forEach((control) => { control.disabled = false; });
         loading = false;
       }
     };
+    registerCurrency(currency, () => {
+      if (hasRequested && currency.value !== requestCurrency) load(true);
+    });
     if (assistant) {
       assistant.addEventListener('submit', (event) => {
         event.preventDefault();
@@ -237,24 +300,24 @@
     let price = 'From price unavailable';
     if (typeof offer.from_price === 'number' && Number.isFinite(offer.from_price)) {
       try {
-        price = `From ${new Intl.NumberFormat('en', { style: 'currency', currency: offer.currency }).format(offer.from_price)}`;
+        price = t('From {price}', { price: new Intl.NumberFormat(locale(), { style: 'currency', currency: offer.currency }).format(offer.from_price) });
       } catch (_) {
-        price = `From ${offer.from_price} ${offer.currency}`;
+        price = t('From {price}', { price: `${offer.from_price} ${offer.currency}` });
       }
     }
     card.append(make('p', 'offer-price', price));
     if (typeof offer.duration_minutes === 'number' && Number.isFinite(offer.duration_minutes)) {
-      card.append(make('p', 'offer-meta', `Supplier duration: ${offer.duration_minutes >= 1440
-        ? `${(offer.duration_minutes / 1440).toFixed(1).replace(/\.0$/, '')} days`
-        : `${offer.duration_minutes} minutes`}`));
+      card.append(make('p', 'offer-meta', t('Supplier duration: {duration}', { duration: offer.duration_minutes >= 1440
+        ? t('{count} days', { count: new Intl.NumberFormat(locale(), { maximumFractionDigits: 1 }).format(offer.duration_minutes / 1440) })
+        : t('{count} minutes', { count: new Intl.NumberFormat(locale()).format(offer.duration_minutes) }) })));
     }
     if (typeof offer.rating === 'number' && Number.isFinite(offer.rating)) {
-      const reviews = Number.isInteger(offer.review_count) ? ` · ${offer.review_count} reviews` : '';
-      card.append(make('p', 'offer-meta', `Viator rating: ${offer.rating}/5${reviews}`));
+      const reviews = Number.isInteger(offer.review_count) ? t(' · {count} reviews', { count: new Intl.NumberFormat(locale()).format(offer.review_count) }) : '';
+      card.append(make('p', 'offer-meta', t('Viator rating: {rating}/5{reviews}', { rating: new Intl.NumberFormat(locale()).format(offer.rating), reviews })));
     }
     const checkedAt = new Date(typeof offer.checked_at === 'string' ? offer.checked_at : NaN);
     if (!Number.isNaN(checkedAt.getTime())) {
-      const checked = make('time', 'offer-meta', `Supplier data checked: ${checkedAt.toLocaleString('en')}`);
+      const checked = make('time', 'offer-meta', t('Supplier data checked: {date}', { date: checkedAt.toLocaleString(locale()) }));
       checked.dateTime = checkedAt.toISOString();
       card.append(checked);
     }
@@ -278,9 +341,11 @@
 
   document.querySelectorAll('[data-offers]').forEach((section) => {
     const load = setupOffers(section, '/mara');
+    const linkedHash = section.getAttribute('data-offer-category') === 'nairobi'
+      ? '#nairobi-extras' : '#safari-options';
     let linkedLoadStarted = false;
     const loadLinkedOptions = () => {
-      if (window.location.hash === '#safari-options' && !linkedLoadStarted) {
+      if (window.location.hash === linkedHash && !linkedLoadStarted) {
         linkedLoadStarted = true;
         load();
       }

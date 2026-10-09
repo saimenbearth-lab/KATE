@@ -11,6 +11,32 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class ProductionBuildTests(unittest.TestCase):
+    def test_german_funnel_has_real_pages_download_and_private_planner_metadata(self):
+        with tempfile.TemporaryDirectory(prefix="kate-german-test-") as temp:
+            output = build(Path(temp) / "dist")
+            for relative in ("index.html", "mara/index.html", "planner/index.html", "guides/index.html", "resources/safari-booking-checklist/index.html"):
+                html = (output / "de" / relative).read_text()
+                self.assertIn('<html lang="de">', html)
+                self.assertIn('hreflang="en"', html)
+                self.assertIn('hreflang="de"', html)
+                self.assertIn('src="/static/i18n.js"', html)
+                self.assertLess(html.index('/static/i18n.js'), html.index('/static/app.js'))
+            self.assertIn('content="noindex,follow"', (output / "de/planner/index.html").read_text())
+            self.assertFalse((output / "de/control/index.html").exists())
+            self.assertIn('BUCHUNGSCHECKLISTE', (output / "de/resources/safari-booking-checklist.txt").read_text())
+            self.assertIn('/de/mara/', (output / 'sitemap.xml').read_text())
+
+    def test_cross_sell_uses_existing_supplier_handoff_and_no_public_admin_navigation(self):
+        with tempfile.TemporaryDirectory(prefix="kate-extras-test-") as temp:
+            output = build(Path(temp) / "dist")
+            home = (output / 'index.html').read_text()
+            mara = (output / 'mara/index.html').read_text()
+            self.assertIn('/mara/#nairobi-extras', home)
+            self.assertNotIn('href="/control"', home)
+            self.assertIn('data-offer-category="nairobi"', mara)
+            self.assertIn('These are separate bookings', mara)
+            self.assertIn('data-offer-category="nairobi"', (output / 'de/mara/index.html').read_text())
+
     def test_static_build_preserves_four_pages_and_assets(self):
         with tempfile.TemporaryDirectory(prefix="kate-static-test-") as temp:
             output = build(Path(temp) / "dist")
@@ -27,8 +53,8 @@ class ProductionBuildTests(unittest.TestCase):
             home = (output / "index.html").read_text()
             planner = (output / "planner/index.html").read_text()
             mara = (output / "mara/index.html").read_text()
-            self.assertIn("PLANNING PREVIEW", home)
-            self.assertIn('href="/planner"', home)
+            self.assertIn("SAFARI PLANNING", home)
+            self.assertIn('href="/planner/"', home)
             self.assertIn('data-planner-form', planner)
             self.assertIn('name="target_date"', planner)
             self.assertIn("Supabase database", planner)
@@ -46,7 +72,8 @@ class ProductionBuildTests(unittest.TestCase):
             self.assertIn('data-control-dashboard', control)
             self.assertIn('type="password"', control)
             self.assertIn("Authorization", js)
-            self.assertNotIn("localStorage", js)
+            admin_js = js.split("const dashboard =", 1)[1]
+            self.assertNotIn("localStorage", admin_js)
             self.assertNotIn("sessionStorage", js)
             self.assertNotIn("SUPABASE_SERVICE_ROLE_KEY", js)
             self.assertNotIn("VIATOR_API_KEY", js)

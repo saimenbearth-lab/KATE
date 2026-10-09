@@ -89,3 +89,13 @@ test('page-view tracking accepts only known routes', () => {
   assert.equal(validatePageView({ page: '/admin' }), null);
   assert.equal(validatePageView({ page: 42 }), null);
 });
+
+test('German visitor routes aggregate to known pages without exposing an invented admin route', () => {
+  for (const path of ['/', '/planner', '/mara', '/guides', '/resources/safari-booking-checklist']) {
+    const translated = path === '/' ? '/de/' : '/de' + path + '/';
+    assert.equal(validatePageView({ page: translated }), path);
+  }
+  for (const path of ['/de/control', '/de/control/', '/de/missing', '/de/mara?fake=1', '/de/../control']) {
+    assert.equal(validatePageView({ page: path }), null);
+  }
+});

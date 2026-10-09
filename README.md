@@ -2,11 +2,14 @@
 
 Production: https://kate-kenya-trip-planner.netlify.app
 
+English and German visitor pages are available through the header language links; [German homepage](https://kate-kenya-trip-planner.netlify.app/de/). Currency changes reload already-visible supplier prices immediately and preserve a valid USD/EUR/GBP/CHF preference across the planner and offer sections. A typed planning budget is never silently converted.
+
 Free tools for travelers:
 
 - [Choose 2-, 3- or 4-day Maasai Mara safari previews](https://kate-kenya-trip-planner.netlify.app/mara/#safari-options): guided priorities and indicative supplier prices.
 - [Safari booking checklist and two-quote comparison worksheet](https://kate-kenya-trip-planner.netlify.app/resources/safari-booking-checklist/): printable, downloadable and shareable.
 - [Maasai Mara planning guides](https://kate-kenya-trip-planner.netlify.app/guides/): questions to resolve before paying.
+- [Optional short Nairobi activities before/after a safari](https://kate-kenya-trip-planner.netlify.app/mara/#nairobi-extras): separate supplier listings and bookings, not services included in a safari package.
 
 KATE may earn a commission through its Viator affiliate links. Confirm dates, selected options and total party prices on Viator.
 
@@ -28,6 +31,12 @@ The build preserves the four original pages, adds a guide hub, two guides and a 
 `/planner` saves a validated planning outline through an atomic database RPC. Nairobi–Maasai Mara plans of 2–4 days can load supplier product previews. `/mara` retains the road-versus-fly-in guide and lets visitors select two-, three- or four-day supplier previews in USD, EUR, GBP or CHF. Previews are not matched to a party budget or comfort preference. From prices, supplier ratings and durations are shown only when the supplier supplies usable values.
 
 The API uses Viator Basic Affiliate `products/search`, on demand, with a five-minute response cache and a shared refresh lease. It does not use `availability/check`, which is unavailable to Basic access. A travel-date search filter does not confirm availability, a group quote, cancellation terms, commission or a booking. Visitors confirm the full itinerary, dates and total price on Viator.
+
+The optional `category=nairobi` query shares the existing server-only supplier key and approved affiliate PID. It only displays Nairobi-titled catalogue activities with a supplied fixed duration or complete duration range of 1–720 minutes; Mara, overnight and multi-day titles are excluded. Its cache and product context are separate from safari results. Both sections load on request and use the existing fresh server-validated native booking handoff. The legacy click RPC intent is still `mara_3d_decision`; distinguish extra activities by the recorded product/category rather than assuming every click is a Mara safari.
+
+EN/DE covers KATE navigation, planning tools, checklists and dynamic interface messages. Product names stay in their supplier's original language; KATE does not translate or verify external Viator pages or contract terms. New unmapped text visibly falls back to English. Language and currency preferences are the only new local-storage values; administrator credentials remain transient.
+
+[Monetization research](docs/monetization-research.md) ranks complementary activity, accommodation, eSIM and insurance routes from current official program information. Only the existing Viator route is integrated; no new applications, contracts, paid advertising or paid services were started. Published commission rates are not evidence of KATE-specific revenue or profit.
 
 Click-outs use native POST forms and a tracked HTTP 303 handoff. The database allows only fresh, active catalogue records from the verified supplier source and HTTPS Viator URLs with KATE's approved PID `P00323912`. Stale records require a refresh. The original discovery records and their provenance remain preserved; their historical links alone do not qualify as current previews.
 

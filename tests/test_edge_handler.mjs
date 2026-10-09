@@ -76,12 +76,56 @@ test('offers fail gracefully before supplier calls when the key is absent', asyn
 });
 
 test('offers reject invalid currencies and complete invalid dates before supplier calls', async () => {
-  for (const query of ['currency=XYZ', 'days=5', 'target_date=2026-10-07extra', 'target_date=2026-02-31']) {
+  for (const query of ['currency=XYZ', 'days=5', 'category=', 'category=other', 'category=Nairobi',
+    'category=nairobi&currency=XYZ', 'category=nairobi&days=5', 'category=nairobi&target_date=2026-02-31',
+    'target_date=2026-10-07extra', 'target_date=2026-02-31']) {
     const s = setup({ vars: { VIATOR_API_KEY: 'key-fixture' } });
     const response = await s.handler(new Request(`https://kate.example/api/offers?${query}`));
     assert.equal(response.status, 400, query);
     assert.equal(s.fetches(), 0);
   }
+});
+
+test('Nairobi activity API stores separate honest context and cache without exposing affiliate URLs', async () => {
+  const activity = { ...upstream.products[0], productCode: '56789P1', title: 'Nairobi National Park Morning Tour',
+    productUrl: 'https://www.viator.com/tours/Nairobi/Park/d5280-56789P1?pid=P00323912',
+    status: 'ACTIVE', duration: { variableDurationFromMinutes: 180, variableDurationToMinutes: 360 } };
+  const s = setup({ vars: { VIATOR_API_KEY: 'key-fixture' }, upstreamValue: { products: [activity] } });
+  // Existing Mara cache cannot masquerade as a Nairobi response.
+  s.memory.set('viator_offers:USD:3:any', { value: JSON.stringify({ offers: [{ product_id: 'mara-cache' }] }), updated_at: new Date().toISOString() });
+  for (let i = 0; i < 2; i++) {
+    const response = await s.handler(new Request('https://kate.example/api/offers?category=nairobi&currency=USD'));
+    assert.equal(response.status, 200);
+    const value = await response.json();
+    assert.equal(value.category, 'nairobi');
+    assert.equal(value.offers[0].product_id, '56789P1');
+    assert.equal(value.offers[0].affiliate_url, undefined);
+    assert.equal(value.offers[0].duration_minutes, null);
+    assert.equal(value.offers[0].duration_max_minutes, 360);
+    assert.equal(value.availability_checked, false);
+  }
+  assert.equal(s.fetches(), 1);
+  const saved = s.calls.find((call) => call.table === 'products').value[0];
+  assert.equal(saved.category, 'activity');
+  assert.equal(saved.comparison_id, 'nairobi-short-activities');
+  assert.equal(saved.destination_text, 'Nairobi, Kenya');
+  assert.equal(saved.snapshot_context.comparison_context, 'nairobi_optional_extras');
+  assert.equal(saved.snapshot_context.duration_min_minutes, 180);
+  assert.equal(saved.snapshot_context.catalogue_status, 'ACTIVE');
+  assert.equal(saved.date_availability_confirmed, false);
+  assert.equal(saved.price_basis_confirmed, false);
+  assert.equal(s.memory.has('viator_offers:nairobi:USD:1-720:any'), true);
+});
+
+test('Nairobi searches share the global refresh lease and reject other affiliate accounts', async () => {
+  const activity = { ...upstream.products[0], title: 'Nairobi Morning Tour', duration: { fixedDurationInMinutes: 120 },
+    productUrl: target.replace('P00323912', 'P00000001') };
+  const blocked = setup({ vars: { VIATOR_API_KEY: 'fixture' }, lease: false, upstreamValue: { products: [activity] } });
+  assert.equal((await blocked.handler(new Request('https://kate.example/api/offers?category=nairobi'))).status, 429);
+  assert.equal(blocked.fetches(), 0);
+  const wrongPid = setup({ vars: { VIATOR_API_KEY: 'fixture' }, upstreamValue: { products: [activity] } });
+  assert.equal((await wrongPid.handler(new Request('https://kate.example/api/offers?category=nairobi'))).status, 503);
+  assert.equal(wrongPid.calls.some((call) => call.table === 'products'), false);
 });
 
 test('Control Center accepts a server-stored password verifier without an environment secret', async () => {

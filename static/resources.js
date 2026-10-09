@@ -1,4 +1,5 @@
 (() => {
+  const t = (text) => window.KATE_I18N?.t(text) || text;
   document.querySelectorAll('[data-copy-template-button]').forEach((button) => {
     const template = document.getElementById(button.getAttribute('aria-controls'));
     const status = document.querySelector('[data-copy-template-status]');
@@ -6,11 +7,11 @@
     button.addEventListener('click', async () => {
       try {
         await navigator.clipboard.writeText(template.value);
-        status.textContent = 'Copied. Replace the bracketed details before using the template.';
+        status.textContent = t('Copied. Replace the bracketed details before using the template.');
       } catch (_) {
         template.focus();
         template.select();
-        status.textContent = 'The template is selected. Copy it using your browser or keyboard.';
+        status.textContent = t('The template is selected. Copy it using your browser or keyboard.');
       }
     });
   });
