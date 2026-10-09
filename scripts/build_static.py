@@ -160,6 +160,7 @@ def production_mara_html() -> str:
         "Add your group size, budget target and comfort preference. Nairobi–Mara plans of 2–4 days can also load supplier product previews.",
     )
     body = body.replace('<section class="compare-section">', PRODUCTION_OFFERS_HTML + '<section class="compare-section">')
+    body = body.replace('<div class="hero-actions mara-intro-actions">', '<p><a href="/guides/nairobi-airport-transfers-and-safari-extras/">Plan Nairobi airport transfers and extra activities</a></p><div class="hero-actions mara-intro-actions">')
     return body + NAIROBI_EXTRAS_HTML
 
 
@@ -237,7 +238,7 @@ def build(destination: Path | str = ROOT / "dist") -> Path:
         target.write_bytes(production_shell(guide["title"], guide["body"], "guide", path=guide["path"], description=guide["description"], article=True))
         german = output / 'de' / guide["path"].strip("/") / "index.html"
         german.parent.mkdir(parents=True, exist_ok=True)
-        german.write_bytes(production_shell(guide["title"], guide["body"], "guide", path=guide["path"], description=guide["description"], article=True, language="de"))
+        german.write_bytes(production_shell(guide["title"], guide.get("body_de", guide["body"]), "guide", path=guide["path"], description=guide["description"], article=True, language="de"))
 
     target = output / RESOURCE["path"].strip("/") / "index.html"
     target.parent.mkdir(parents=True, exist_ok=True)

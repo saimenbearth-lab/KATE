@@ -11,6 +11,7 @@ export function createHandler({ dbFactory, env, fetchImpl = fetch }) {
     "/guides": "mara_safari_research",
     "/guides/3-day-masai-mara-safari-from-nairobi": "mara_3d_decision",
     "/guides/private-vs-shared-masai-mara-safari": "mara_group_type_decision",
+    "/guides/nairobi-airport-transfers-and-safari-extras": "nairobi_transfer_and_activity_planning",
     "/resources/safari-booking-checklist": "safari_booking_checks",
   };
 

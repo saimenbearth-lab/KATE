@@ -10,6 +10,7 @@ Free tools for travelers:
 - [Safari booking checklist and two-quote comparison worksheet](https://kate-kenya-trip-planner.netlify.app/resources/safari-booking-checklist/): printable, downloadable and shareable.
 - [Maasai Mara planning guides](https://kate-kenya-trip-planner.netlify.app/guides/): questions to resolve before paying.
 - [Optional short Nairobi activities before/after a safari](https://kate-kenya-trip-planner.netlify.app/mara/#nairobi-extras): separate supplier listings and bookings, not services included in a safari package.
+- [Nairobi airport transfer and extra-day guide](https://kate-kenya-trip-planner.netlify.app/guides/nairobi-airport-transfers-and-safari-extras/): flight-first timing, luggage and admission checks, with a copyable supplier request in English and German.
 
 KATE may earn a commission through its Viator affiliate links. Confirm dates, selected options and total party prices on Viator.
 
@@ -24,7 +25,7 @@ python3 -m unittest discover -s tests -v
 node --test tests/*.mjs
 ```
 
-The build preserves the four original pages, adds a guide hub, two guides and a free booking resource, includes guided supplier preview cards, and writes `dist/build.json` with the Netlify `COMMIT_REF` identifier (or `COMMIT` in CI). Generated output is ignored by Git. GitHub Actions runs the Python checks, Node checks and complete static build. The original hero image must be present in a full checkout.
+The build preserves the four original pages, adds a guide hub, three guides and a free booking resource, includes guided supplier preview cards, and writes `dist/build.json` with the Netlify `COMMIT_REF` identifier (or `COMMIT` in CI). Visitor pages have German equivalents, for 17 HTML pages in total. Generated output is ignored by Git. GitHub Actions runs the Python checks, Node checks and complete static build. The original hero image must be present in a full checkout.
 
 ## Public experience
 

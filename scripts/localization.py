@@ -7,7 +7,7 @@ import json
 from urllib.parse import urlsplit, urlunsplit
 
 SITE_URL = 'https://kate-kenya-trip-planner.netlify.app'
-PUBLIC_PATHS = ('/', '/mara/', '/planner/', '/guides/', '/guides/3-day-masai-mara-safari-from-nairobi/', '/guides/private-vs-shared-masai-mara-safari/', '/resources/safari-booking-checklist/')
+PUBLIC_PATHS = ('/', '/mara/', '/planner/', '/guides/', '/guides/3-day-masai-mara-safari-from-nairobi/', '/guides/private-vs-shared-masai-mara-safari/', '/guides/nairobi-airport-transfers-and-safari-extras/', '/resources/safari-booking-checklist/')
 
 # Exact visible-text matches, not replacements inside HTML, IDs or form values.
 _PAIRS = '''Home\tStartseite
@@ -357,6 +357,9 @@ Maasai Mara safari planning guides\tPlanungsratgeber für Maasai-Mara-Safaris
 TEXT_DE = {line.split('\t', 1)[0].strip(): line.split('\t', 1)[1] for line in _PAIRS.splitlines() if '\t' in line}
 TEXT_DE['Choose language'] = 'Sprache wählen'
 TEXT_DE.update({
+    'Nairobi Airport Transfers and Activities Before or After a Safari': 'Nairobi: Flughafentransfers und Aktivitäten vor oder nach der Safari',
+    'Plan Nairobi airport pickup and short activities around your safari. Check flight timing, luggage, entry charges and separate booking terms before choosing.': 'Plane Flughafentransfers und kurze Aktivitäten in Nairobi rund um deine Safari. Prüfe Flugzeiten, Gepäck, Eintrittsgebühren und separate Buchungsbedingungen.',
+    'Plan Nairobi airport transfers and extra activities': 'Nairobi-Flughafentransfers und zusätzliche Aktivitäten planen',
     'SAFARI PLANNING': 'SAFARI-PLANUNG',
     'Safari options': 'Safari-Angebote',
     'Compare 2–4-day Maasai Mara safaris.': 'Vergleiche Maasai-Mara-Safaris für 2–4 Tage.',

@@ -14,7 +14,7 @@ from pathlib import Path
 import re
 import time
 from urllib.error import HTTPError
-from urllib.parse import urlsplit
+from urllib.parse import unquote, urlsplit
 from urllib.request import Request, urlopen
 import xml.etree.ElementTree as ET
 
@@ -68,7 +68,8 @@ def live_build(expected_commit: str | None, *, wait_attempts=1):
 
 def health_monitor(expected_commit=None, *, wait_attempts=1):
     build = live_build(expected_commit, wait_attempts=wait_attempts)
-    for path in ("/", "/mara/", "/guides/"):
+    public_paths = ("/", "/mara/", "/guides/", "/de/", "/de/mara/")
+    for path in public_paths:
         status, body = request(SITE_URL + path)
         if status != 200 or b"<html" not in body.lower():
             raise ValueError("Public page is unhealthy: " + path)
@@ -79,7 +80,7 @@ def health_monitor(expected_commit=None, *, wait_attempts=1):
     control_status, _ = request(SITE_URL + "/api/control")
     if control_status != 401:
         raise ValueError("Unauthenticated control endpoint is not protected")
-    return {"production_commit": build.get("commit"), "api_release": health.get("release"), "page_statuses": "3 public pages returned 200", "api_healthy": True, "unauthenticated_control_status": control_status, "browser_events_or_clicks_created": False}
+    return {"production_commit": build.get("commit"), "api_release": health.get("release"), "page_statuses": f"{len(public_paths)} public pages returned 200", "api_healthy": True, "unauthenticated_control_status": control_status, "browser_events_or_clicks_created": False}
 
 
 def sitemap_urls(data: bytes):
@@ -90,7 +91,16 @@ def sitemap_urls(data: bytes):
         if not isinstance(url, str):
             raise ValueError("Empty sitemap URL")
         parsed = urlsplit(url)
-        if parsed.scheme != "https" or parsed.netloc != urlsplit(SITE_URL).netloc or parsed.query or parsed.fragment or parsed.path.startswith(("/api", "/control", "/planner")):
+        decoded_path = unquote(parsed.path, errors="strict")
+        segments = [segment for segment in decoded_path.split("/") if segment]
+        # Only canonical public routes belong in the sitemap. Decode once to
+        # catch escaped private names, and reject traversal or nested escapes.
+        if "%" in decoded_path or "\\" in decoded_path or any(segment in {".", ".."} for segment in segments):
+            raise ValueError("Sitemap contains a noncanonical path")
+        if segments and segments[0] == "de":
+            segments = segments[1:]
+        public_path = "/" + "/".join(segments)
+        if parsed.scheme != "https" or parsed.netloc != urlsplit(SITE_URL).netloc or parsed.query or parsed.fragment or public_path.startswith(("/api", "/control", "/planner")):
             raise ValueError("Sitemap contains a private or unowned URL")
     return urls
 
